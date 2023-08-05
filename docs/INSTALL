@@ -1,0 +1,150 @@
+Generic installation instructions for AUTOSTRUCTURE version 29.x.
+                                      *************
+ 
+A Fortran 95 compiler is required (but no F2003, F2008 extensions are used, currently.)
+
+See for example:
+
+Intel (Linux, Mac OS, Windows) Recommended (Free for personal use)
+ https://software.intel.com/en-us/fortran-compilers
+
+gfortran (Linux, Mac OS, Windows) Recommended (Free)
+ http://gcc.gnu.org/wiki/GFortranBinaries
+
+Nvidia/PGI (Linux, Mac OS, Windows) (Free for personal use)
+ https://developer.nvidia.com/nvidia-hpc-sdk-downloads
+# https://www.pgroup.com/products/community.htm
+
+Oracle (Linux) (Free for personal and commercial use)
+ https://www.oracle.com/tools/developerstudio/downloads/developer-studio-jsp.html
+
+
+The instructions below assume that you are working in a Unix environment.
+(They should be shell independent.)
+
+MS Windows can be used, but it is  a very different environment, e.g. Visual Studio.
+If you are familiar with using Fortran under it then you should be able to adapt
+the instructions below. To work at the command line you will at least need to use
+the Visual Studio oneapi command prompt.
+Alternatively, it is time to install Linux alongside Windows (e.g. Linux Mint - cinnamon)
+or the MS Windows Subsystem for Linux Version 2 (WSL2).
+
+
+Minimal install & set-up.
+-------------------------
+
+0/ If you have not already done so, download the source file (asdeck.f95) from
+   apap-network.org/autos/
+
+1/ Compile AUTOSTRUCTURE:
+
+f95 asdeck.f95 -o aslm.x
+
+Notes:
+
+a) Replace f95 with your usual compiler command e.g. ifort, gfortran, nvfortran/pgf95
+   Note, use "ifort -Tf asdeck.f95" as it does not recognize .f95 else.
+
+b) Use any optimization flags that you would normally use e.g. -O3.
+
+c) No libraries are required.
+
+
+2/ Execute AUTOSTRUCTURE
+
+aslm.x <das
+
+The file "das" should contain the UNIT5 data as discussed in the WRITEUP file.
+Sample datasets are included in the ./data sub-directory along with this file.
+The default (user-friendly) output is to the file ./olg.
+
+(If the above results-in "aslm.x: Command not found", or some such, then try
+./aslm.x <das
+since the current (dot ".") directory is likely not in your path then.)
+
+
+This completes the minimal install & set-up.
+--------------------------------------------
+
+
+Notes:
+------
+
+0/ There is no machine dependent code (and no F95, F2003, F2008 obsolescent/deleted features.) 
+
+1/ pasdeck.f95 is the (explicit MPI) parallel (f95) version.
+
+2/ asdeck_lap.f95 uses BLAS/LAPACK libraries, which the user must link to -
+   see below. These should be the ones supplied by Intel/nvidia/Oracle.
+   (For gfortran, use the Intel Math Kernel Library (MKL) - ask your IT support.)
+   There is no performance advantage compiling them yourself over the
+   non-BLAS/LAPACK version of AUTOSTRUCTURE.
+
+   The current routines callable directly are:
+   DDOT, DAXPY
+   DGEMM, DSYTRF, DSYTRS, DSYTRI
+   DSYEV, DSYEVD, DSYEVR, DSYEVX
+
+3/ If you require a fixed-format .f version, e.g. for application wrappers
+   which only process such, then simply
+
+   cp asdeck.f95 asdeck.f
+
+   or link symbolically (ln -s), as it is fully backwards compatible.
+
+4/ AUTOSTRUCTURE makes use of many modules. Compilation then creates many .mod files.
+   They can simply be deleted once compilation has completed via
+   rm *.mod
+   so as to avoid directory clutter.
+   (Or, you can set the compiler flag, see below, or environment variable which your compiler
+    uses so as to redirect the output directory for the .mod files from the default one.)
+
+
+
+"Advanced" compiler settings:
+-----------------------------
+
+Intel:
+ifort -O3 -mcmodel=medium -module /var/tmp -Tf asdeck_lap.f95 -o aslm.xi  -qmkl
+
+Gnu (+Intel MKL):
+gfortran -O3 -mcmodel=medium -I /var/tmp -J /var/tmp  asdeck_lap.f95 -o aslm.xg -lmkl_gf_lp64 -lmkl_gnu_thread -lmkl_core -lgomp
+
+Nvidia/PGI:
+nvfortran/pgf95 -O3 -mcmodel=medium -module /var/tmp  asdeck_lap.f95 -o aslm.xpg   -lblas -llapack
+
+Oracle:
+f95   -O3 -m64 -xmodel=medium -moddir=/var/tmp  asdeck_lap.f95 -o aslm.x -library=sunperf
+
+
+-O3 is the recommended optimization level for production runs.
+
+-mc/x/model=medium is necessary for large memory runs.
+
+/var/tmp is used here to "dump" the .mod files (as they are not needed after compilation).
+
+-qmkl/-lxxx/library show the library flags to link to the compiler/vendor optimised BLAS/LAPACK.
+
+
+Intel:  -Tf is necessary since ifort does not support the .f95 extension.
+
+Nvidia/PGI: pgf95 is being rebranded as nvfortran.
+
+Oracle: -m64 is for the Oracle Solaris OS, which defaults to -m32 (32-bit).
+
+
+
+Multi-threading:
+----------------
+
+If you have a sufficient number of cores/threads then set the environment variable OMP_NUM_THREADS
+to 4, 8, 12 as per your hardware.
+
+The compiler/vendor optimised BLAS/LAPACK libraries include OpenMP directives which significantly
+speed-up Hamiltonian diagonalization (DSYEVD/DSYEVR) and rate formation (DDOT/DGEMM) which constitute
+the major (non-algebra) time usage in large cases. These directives are only active in a serial
+environment, i.e use asdeck_lap.f95 *NOT* pasdeck_lap.f95. If a parallel (MPI) environment is detected
+then OpenMP is not activated.
+
+
+NRB 15/05/23
