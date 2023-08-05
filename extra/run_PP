@@ -1,0 +1,1540 @@
+#!/bin/csh
+#N.R. BADNELL                    RUN PP (V3.13)                             21/11/22
+
+#
+#RUN SCRIPT TO GENERATE PP adfnn FILE FOR A SPECIFIED SEQUENCE/ION/CORE, WHERE 
+#PP=DR,RR,PE,PI AND SO nn=09,48,38,39 (IT IS A MERGER OF THE ORIGINAL SEPARATES)
+
+#*** REQUIRES THAT *ALL* INPUT FILES PRE-EXIST UNDER ADAS NAMING CONVENTIONS UNDER
+#*** DIRECTORIES $MDIR/adf27,8/seq/files; adfnn FILES OUTPUT to $RDIR/adfnn/seq/files
+#*** USER SPECIFIES $MDIR AND $RDIR.
+#
+#Examples of naming structure:
+#
+#   PP     adf27 (AS str)    adf27 (AS coll)   adf28 (post-proc)    Notes
+#   --     ---------------   --------------    -----------------    -----
+#   DR     Xnic22_str.dat     Xnic22-n.dat        Xnic22.dat        YY=22 SUB=n
+#   RR     Xnic_str.dat       Xnic-n.dat          Xnic.dat          SUB=n
+#   PI     Xnic1-2_str.dat    Xnic1-2.dat         Xnic1-2.dat       YY=1 SS=2 (NSUB=1)
+#   PE     Xnic1-3_str.dat    Xnic1n-3.dat        Xnic1-3.dat       YY=1 SUB=n SS=3
+#
+#Alternatively, a single base file XnbaseYY per core excitation YY can be made present,
+#and the above AS str and AS coll X-files will be generated as per the settings below of
+#the process requirements. (N.B. YY="" for RR, i.e. Xnbase.) 
+#Similarly, an Xnbase file can be used for the adaspp post-proc - currently, only DR/RR.
+#If specific X-files are present they will be used in preference, remove/name them!
+
+#If RESTART is used then AUTOSTRUCTURE input files *must* be set appropriately for 
+#MSTART and the RESTART files must be pre-generated under $RDIR/seq/$RESTD/mn/i where  
+set RESTD = RESTD
+#for each sub-process i (i=1,2,... NSUB) of any base core excitation m-n; i.e.
+#a directory structure of RESTART files is to be populated analagous to the subsequent 
+#AS run dirs: this can be generated with "element" XX=$RESTD using Z0=0.
+
+#Similarly, if observed energies (e.g. in Xnic22_obs.dat) are in use (for adaspp) then
+#the X-file & Xnbase file must be set (NECOR) appropriately.
+
+#                            -----------------------------------
+
+#Initialize counter for variables supplied as argument on command line (e.g. run_PP fe23):
+set acount = 0                   #Do NOT comment-out!
+
+#***************************
+#SET THE FOLLOWING VARIABLES (The spaces are IMPORTANT for C-shell.)
+#***************************
+
+#Set the *** basic process *** (~ the AS RUN variable = DR,RR,PE,PI):
+set PP = DR
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set PP = $argv[$acount]                                     
+
+#Set complement (DO NOT CHANGE):
+set pp = `echo $PP | tr "[A-Z]" "[a-z]" `
+
+#
+#These are normally a one-off set-up:
+#------------------------------------
+
+#User initials:
+set USR = nrb
+
+#Year code (not calendar year):
+set YR = 12
+
+#Type of (DR/RR) adf09/48 file, default (=3) for rate coeffs vs T, =5 for cross sections vs E:
+set ITYPE =
+
+#Root directory for all inputs, calculations, database etc
+set ROOT = /raid/badnell
+
+#Path to readable master PP directory (where input $MDIR/adf27,8/seq/files exist):
+#set MDIR = ${ADASCENT}
+set MDIR = ${ROOT}/${PP}/X
+
+#Path to writeable Run directory      (and where adf09 will be archived: $RDIR/adf09/seq/files):
+set RDIR = ${ROOT}/${PP}
+
+#Serial AUTOSTRUCTURE executable, for non-Rydberg runs (assumed in user path if not absolute):
+set ASLMX = ${MDIR}/CODES/aslm29.x
+
+#Number of processors for ***PARALLEL*** Rydberg run, set .le. 0 for serial here as well :
+set NPROC = -5
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set NPROC = $argv[$acount]                                     
+
+#Parallel launch sequence for AUTOSTRUCTURE executable (*excluding* UNIT5 datafile):
+set PASLM = "mpirun -np $NPROC -m ${MDIR}/CODES/rankmap ${MDIR}/CODES/paslm29.x"
+
+#ADASPP executable, explicitly or by PP (assumed in user path if not absolute):   ***MUST BE SERIAL FOR SINGLE ADF09
+#set ADASPPX = adasdr.x
+set ADASPPX = ${MDIR}/CODES/adas${pp}.x
+
+#FIT executable name - leave blank to skip fit (currently RR and DR only and FINAL coupling scheme):
+#set CFITX = cfit${PP}.x
+set CFITX = 
+
+#Clean-up of files: = all removes everything from the $XX/$YY run directory, = rates, just removes rate files:
+set CLEAN = 
+
+#RUN AUTOS+ADASPP = all, AUTOS structure only = struc, AUTOS only = autos, ADASPP only = adas${pp}, FIT only = fit, CLEAN = clean
+#set RUN = adas${pp}
+set RUN = all
+
+#
+#These are ion/seq specific:
+#---------------------------
+
+#If $MDIR = $ADASCENT then MUST add central user/year code e.g. nrb00"#"li (# MUST be protected by ""):
+set CUSR =                                                  #else can set blank
+
+#Sequence, element symbol only (e.g. c for clike LOWER CASE, or 06 for a numeric label):
+#set ZZ = be
+@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+set ZZ = $argv[$acount]
+
+#Nuclear charge, set >=0 if input X-files (Xnic22-n.dat etc) being used/edited else set <0 for existing ion specifc input files:
+set Z0 = 74                                                 #Use 0 to generate RESTART files, then script sets XX = $RESTD
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set Z0 = $argv[$acount]                                     #Do NOT add a leading zero, e.g. Z0 = 6 for Carbon, for tcsh 6.14-17
+
+#Element LOWER CASE and charge e.g. fe23. Ignored if generating RESTART files:
+#set XX = w70                                                #Can be element only if combined with ZA construct (below)
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set XX = $argv[$acount]                                     
+#
+#can only use ZA construct below if ZZ is NUMERIC - no need to comment-out if not used
+set i0 = `echo $ZZ | cut -c1-1`
+if ( $i0 =~ [0-9] ) then                                    #We have a number, not a letter.
+  if ( $i0 == 0 ) then                                      #Strip for tcsh 6.14-17 (octal parse)
+    set IZ = `echo $ZZ | cut -c2-2`
+  else
+    set IZ = $ZZ
+  endif  
+  if ( $Z0 >= 0 ) then
+    @ ZA = $Z0 - $IZ
+  else
+    @ ZA = - $Z0 + $IZ
+  endif
+  set XX = w$ZA                                             #Must comment-out to ignore use of ZA construct if ZZ NUMERIC
+#  set XX = ${XX}${ZA}                                       #Or read (above) element symbol only
+endif
+
+#Base n-shell (core) excitation; lower-upper DR or lower only PE/PI (e.g. 2-3 but OMIT hyphen!): ***NOT used by RR
+#set YY = 23
+if( $PP != "RR" ) then
+  @ acount = $acount + 1                                    #MUST uncomment acount counter if $argv used!
+  set YY = $argv[$acount]
+endif
+
+#Spectator n-shell, e.g. 2 for PE/PI from ground L-shell complex n=2: ***NOT used by DR/RR
+set SS =  2
+if( $PP == "PE" || $PP == "PI" ) then
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set SS = $argv[$acount]
+endif
+
+#Number of sub-processes (upper n-shell electron-captures/photoexcitations/recombinations - can be zero for PI):
+#set NSUB = 2
+@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+set NSUB = $argv[$acount]
+
+#Label sub-processes e.g. ( 3 n ) for DR $YY,3 and $YY,n. MUST correspond to ADAS format - see adf27/28 examples above:
+#
+#set SUB = ( 3 n )                #Use 0 to skip (autos) for a previously computed sub-process e.g. ( 0 n )
+
+set SUB = ( " " " " " " " " " " " " )    #Make at least NSUB spaces for input via argument. COMMENT-OUT to use above entry.
+
+if ( $SUB[1] == "" ) then        #Assign command line arguments - no need to comment-out if not used
+  set scount = 1
+  while ( $scount <= $NSUB )
+    @ acount = $acount + 1
+    set SUB[$scount] = $argv[$acount]
+    @ scount = $scount + 1
+  end
+endif
+
+#
+#These are more general:
+#-----------------------
+
+#Number of coupling schemes to be processed (1 or 2):
+#set NCUP = 2
+@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+set NCUP = $argv[$acount]
+
+#Label coupling schemes e.g. ( ca ) for CA run *or* ( ls ic ) for LS & IC run, or ( ls ) for pure LS - expects ADAS file label ls:
+#
+if ( $PP == "DR" || $PP == "PE" ) then
+  set Z0R = 30
+else                             #As RR database is all ic.
+  set Z0R = 92
+endif
+if ( $Z0 <= $Z0R ) then
+  set CUP = ( ls ic )
+else                             #Note, do not require separate ic and icr input files as script converts ic to icr
+  set CUP = ( lsr icr )
+endif
+
+set HYB = ""                     #For possible use of hybrid "h" flag, anything else flags non-hybrid.
+#@ acount = $acount + 1                                      #MUST uncomment acount counter if $argv used!
+#set HYB = `echo $argv[$acount] | cut -c1-1`
+
+set CUP = ( " " " " )            #COMMENT-OUT to use above (default) entry.
+
+if ( $CUP[1] == "" ) then        #Assign command line arguments - do not comment-out if not "used", case else
+  @ acount = $acount + 1
+  if ( $NCUP == 1 ) then
+    set CUP = ( $argv[$acount] )
+  else if ( $NCUP == 2 ) then
+    set aacount = $acount
+    @ aacount = $aacount + 1
+    set CUP = ( $argv[$acount] $argv[$aacount] )
+    @ acount = $acount + 1
+  endif
+else if ( $HYB == "h" ) then     #Just add hybrid flag to default coupling (and adjust year code)
+  set ccount = 1
+  while ( $ccount <= $NCUP )
+    set CUP[$ccount] = ${HYB}$CUP[$ccount]
+    @ ccount = $ccount + 1
+  end
+  if ( $YR == "00" ) set YR = 12
+endif
+
+#Number of metastables, per coupling scheme; ONLY used by post-proc Xnbase file and/or fitting (if CFITX enabled):
+#
+#set META = ( 0 0 )
+set META = ( " " "0" )           #COMMENT-OUT to use above entry. (Shouldn't be more than 2 coupling schemes.)
+
+if ( $META[1] == "" ) then       #Assign command line arguments - no need to comment-out if not used
+  set ccount = 1
+  while ( $ccount <= $NCUP )
+    @ acount = $acount + 1
+    set META[$ccount] = $argv[$acount]
+    @ ccount = $ccount + 1
+  end
+endif
+
+#If hybrid DR (e.g. hicr) then flag radiation bundled by configuration. *** Currently, adasdr cannnot handle a mix, so
+set NRSLMX = -10000              #*** DO NOT CHANGE *** For possible future development ONLY!
+
+#Test print of basic input variables
+#echo $ZZ $Z0 $XX $YY $NSUB $SUB $NCUP $CUP $META
+#exit
+
+#*********************
+#END SET VARIABLE LIST
+#*********************
+
+#Advanced usage: 
+
+
+if ( $Z0 > 0 ) then               #set potential scaling parameters
+
+  set NLAMC = 0                                                       #No. of lamdas already set in X-file (optional)
+#  @ acount = $acount + 1                                              #MUST uncomment acount counter if $argv used!
+#  set NLAMC = $argv[$acount]
+
+  set NLAMV = 1                                                       #No. of lambdas to be added via LAMBDA
+#  @ acount = $acount + 1                                              #MUST uncomment acount counter if $argv used!
+#  set NLAMV = $argv[$acount]
+
+  @ NLAM = $NLAMC + $NLAMV                                            #case user has not set NLAM explicitly in X-file
+
+  set LAMBDA = ( 1.0 )
+#  set LAMBDA = ( " " " " " " " " " " " " " " " ")         #COMMENT-OUT to use previous entry - need at least NLAMV "blanks"
+
+  if ( $LAMBDA[1] == "" ) then    #Assign command line arguments - no need to comment-out if not used
+    set ccount = 1
+    while ( $ccount <= $NLAMV )
+      @ acount = $acount + 1
+      set LAMBDA[$ccount] = $argv[$acount]
+      @ ccount = $ccount + 1
+    end
+  endif
+
+#  echo $NLAM $LAMBDA                                                 #Test print of input variables
+#  exit
+
+endif
+
+if ( $Z0 >= 0 ) then              #handshake flags for editing X-files:
+
+  set labz1 = "NZION=-X"                                              #NZION: $labz1 is edited to
+  set labz2 = "NZION=${Z0}"                                           #       $labz2 (recall: + is TF, - is STO)
+
+  if ( $Z0 == 0 ) then            #need to allow for graceful read of NZION, so still need to edit any user flags
+    set NLAM = 1                                                      #placeholder
+    set LAMBDA = ( 1.0 )                                              #placeholder
+  endif
+
+  set lablam = "L.0"                                                  # *single* lablam flag is edited to LAMBDA (see above)
+  set labnl1 = "NLAM=-NL"                                             #NLAM: $labnl1 is edited to  (optional)
+  set labnl2 = "NLAM=${NLAM}"                                         #      $labnl2               (can set value in X-file)
+
+endif
+
+                                  # re-label parallel o-files, or not, default NSUB1 = 0 - relabel
+                                  # = 0 parallel-by-l files relabelled (can mix with equiv run) - no parallel-by-nl
+                                  # = 1 no re-labelling of parallel files - necess. for par-by-nl, but no equiv run
+set NSUB1 = 0
+
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+
+# USER WILL NOT NORMALLY CHANGE ANYTHING FROM HERE-ON
+
+#--------------------------------------------------------------------------------------------------------------
+#--------------------------------------------------------------------------------------------------------------
+
+
+#Parallel specific checks/set-up:
+
+if ( $RUN == "pautos" ) set RUN = autos                               #just in case...
+
+#Currently, assumes outfiles named xxxnn for nn=00-99, so
+if ( $NPROC > 100 ) then                                              #unlikely
+  echo "***Parallel script currently handles files xxnn for nn=00-99, so reduce NPROC.le.100"
+  exit
+endif
+
+#Fix for DR hlike Rydberg n-loop, but *no* l-loop.
+if ( $PP == "DR" && $ZZ == "h" && $NPROC > 0 ) set NPROC = -$NPROC
+
+#End parallel specific checks/set-up
+
+
+#Initialize for run-type based-on PP:
+
+if ( $PP == "RR" || $PP == "PI" ) then
+  set OP =                                                            #dummy to flag existence of op files
+  set PI = "PI"                                                       #switch-on RUN='PI'
+  if ( $PP == "RR" ) then
+    set YY =                                                          #as not needed, but process silently
+    set SS =                                                          #as not needed, but process silently
+    set LABT =
+  else                                                                #PP=PI
+    set tx =                                                          #if non-blank, archive adf39 totals with ext $tx
+    set px =                                                          #optionally archive adf39 partials with ext $px
+    set LABT = "spectator"
+    if ( $NSUB < 1 ) then
+      set NSUB = 1
+      set SUB[1] = ""
+    endif
+    if ( $YY == "" ) then
+      echo "***Error: Must set an entry for YY: $YY "
+      exit
+    endif
+  endif
+else
+  set PI = "  "                                                       #no photoionization
+  if ( $PP == "DR" ) then
+    set SS =
+    set LABT = "core excitation"
+  else
+    if ( $PP != "PE" ) then
+      echo "***Illegal entry for PP, only DR/RR/PE/PI allowed but PP: $PP "
+      exit
+    endif
+    set LABT = "core-spectator"
+  endif
+endif
+
+if ( $SS != "" ) then                                                 #PE/PI
+  set YYD = ${YY}
+  set DSS = "-"${SS}
+else                                                                  #DR/RR
+  set YYD = ${YY}"-"
+  set DSS =
+endif
+
+                                                                      #case non-standard, user could change...
+set adf27 = adf27
+set adf28 = adf28
+                                                                      #standard adfnn outfiles
+if ( $PP == "DR" ) set adfpp = adf09
+if ( $PP == "RR" ) set adfpp = adf48
+if ( $PP == "PE" ) set adfpp = adf38
+# (PI can be also be processed via PP=RR and RUN/ADASPPX=adaspi/.x using RR file names.)
+if ( $PP == "PI" || $RUN == "adaspi" ) set adfpp = adf39              #RR infiles PI outfile
+
+if ( $PP == "PE" || $PP == "PI" ) set META = 0                        #switch-off silently, for now
+
+set ADASPP = ADAS${PP}
+if ( $adfpp == "adf39" ) set ADASPP = ADASPI
+set adaspp = adaspp
+
+set tr = `echo $RUN | cut -c1-4`
+if ( $tr == "adas" ) set RUN = $adaspp
+
+set ttype =
+if ( $PP == "DR" || $PP == "RR" ) then
+  set ITYPE0 = $ITYPE
+  if ( $ITYPE0 < 0 )  set ITYPE = `echo $ITYPE0 | cut -c2-2`
+  if ( $ITYPE == "3" || $ITYPE == "5" ) then           #set any explicit extension to adfpp
+    set ttype = "_t"${ITYPE}
+  else if ( $ITYPE != "" ) then                        #ADAS also allows 1 & 4, but not here
+    echo " Illegal entry for ITYPE=$ITYPE - only 3 or +/-5 allowed "
+    exit
+  endif
+endif
+
+
+#Check for meaningful NCUP and CUP:
+
+if ( $NCUP < 1 || $NCUP > 2 ) then
+  echo "***Number of coupling schemes to process should be 1 or 2: NCUP= $NCUP "
+  exit
+else
+  set TCUP = ( $CUP )
+  set check = 0
+  set ccount = 1
+  while ( $ccount <= $NCUP )
+    set h = `echo $CUP[$ccount] | cut -c1-1`
+    if ( $h == "h" ) then                              #set hybrid flag
+      set t0 = `echo $CUP[$ccount] | cut -c2-3`
+      set ht = ${h}${t0}
+      if ( $ht != $CUP[$ccount] ) then
+        set c0 = `echo $CUP[$ccount] | cut -c2-4`
+      else
+        set c0 = ${t0}
+      endif
+    else
+      set h = ""
+      set t0 = `echo $CUP[$ccount] | cut -c1-2`
+      set ht = ${t0}
+      set c0 = $CUP[$ccount]
+    endif
+    set TCUP[$ccount] = ${t0}
+    if ( $t0 == "ca" || $t0 == "ls" || $t0 == "ic" ) @ check = $check + 1
+    @ ccount = $ccount + 1
+  end
+  if ( $check != $NCUP ) then
+     echo "***Illegal entry for CUP, only (h)ca/ls/ic(r) allowed but CUP:$CUP "
+     exit
+  endif
+  if ( $NCUP == 2 ) then
+    if ( $TCUP[1] == "ca" || $TCUP[2] == "ca" ) then
+      echo '***Error: can only have "(h)ls ic" or "(h)lsr icr" if NCUP= 2'
+      exit
+    endif
+  endif
+  set C0 = `echo $c0 | tr "[a-z]" "[A-Z]" `            #Replace base file CUP with input
+  if ( $t0 != $c0 ) then                               #set-up edit labels to juggle IC vs ICR etc.
+    set T0 = `echo $t0 | tr "[a-z]" "[A-Z]" `
+    set cup = "'${T0}'"
+    set cupm = "'${T0}M'"
+    set cupr = "'${T0}R'"
+  else
+    set cup = 
+  endif
+endif
+
+if (! -e $RDIR ) mkdir $RDIR
+
+if ( $Z0 < 0 ) then                                    #AS ion specific input files
+  set WW = $XX
+else                                                   #Will need to edit X-files
+  set WW = Xn                                          #X-file root name
+  set XNB = Xnbase                                     #Base X-file root name
+  set tempb = ${XNB}${YY}                              #Base file label
+  set Y1 = `echo $YY | cut -c1-1`                      #Base core initial
+  set Y2 = `echo $YY | cut -c2-2`                      #Base core final
+
+                                                       if ( $Z0 > 0 ) then
+  if (! -e ${RDIR}/${adf27} ) mkdir ${RDIR}/${adf27}   #Set-up Archive adf27 dir
+  set temp27r = ${RDIR}/${adf27}/${ZZ}like
+  if (! -e ${temp27r} ) mkdir ${temp27r}
+  if (! -e ${RDIR}/${adf28} ) mkdir ${RDIR}/${adf28}   #Set-up Archive adf28 dir
+  set temp28r = ${RDIR}/${adf28}/${ZZ}like
+  if (! -e ${temp28r} ) mkdir ${temp28r}
+                                                       else
+  set XX = $RESTD
+                                                       endif
+endif
+
+
+echo " "
+echo "----------------------------------------------------------------"
+echo "Start $PP run for seq ${ZZ}-like, ion $XX $LABT ${YY}${DSS}"
+echo "----------------------------------------------------------------"
+
+
+#Set-up directory structure (if not already present):
+
+cd $RDIR
+
+if (! -e ${ZZ}like ) mkdir ${ZZ}like
+cd ${ZZ}like
+
+if (! -e $XX ) mkdir $XX  
+cd $XX
+
+set tempw = ${YY}${SS}
+if ( ${tempw} != "" ) then
+  if (! -e ${tempw} ) mkdir ${tempw} 
+  cd ${tempw}
+endif
+
+                                                       if ( $RUN != $adaspp && $RUN != "fit" && $RUN != "clean" ) then
+
+if ( ${CUSR} != "" ) then                              #ADAS central
+  set temp27m = ${MDIR}/${adf27}/${pp}/${ZZ}like/${CUSR}
+else
+  set temp27m = ${MDIR}/${adf27}/${ZZ}like
+endif
+if (! -e ${temp27m} ) then
+  echo "***Error: AUTOS input directory not found: ${temp27m}"
+  exit
+endif
+
+#AUTOS input files:
+
+if ( -e radwin ) rm radwin
+set tempx = ${CUP[$NCUP]}                              #assume labelled by last scheme
+set temp = ${tempx}${YY}${DSS}
+set tempd = ${WW}${temp}
+if (! -e ${temp27m}/${tempd}_str.dat && $cup != "" ) then
+  if ( $WW == "Xn" ) then                              #since TCUP.ne.CUP
+    set tempdt = ${WW}${ht}${YY}${DSS}
+    if ( -e ${temp27m}/${tempdt}_str.dat ) then
+      cp ${temp27m}/${tempdt}* .
+    else
+      cp ${temp27m}/${WW}*${YY}* .                     #press on regardless
+    endif
+    if ( -e ${tempdt}_rad.dat ) cp ${tempdt}_rad.dat radwin
+  else                                                 #press on regardless
+#    cp ${temp27m}/${tempd}* .
+    cp ${temp27m}/${WW}${tempx}${YY}* .
+  endif
+else
+#  cp ${temp27m}/${tempd}* .
+  cp ${temp27m}/${WW}${tempx}${YY}* .
+endif
+
+#Ensure any base file present
+if ( $WW == "Xn" ) then
+  if ( -e ${temp27m}/${tempb} ) cp ${temp27m}/${tempb} .
+endif
+
+#Assumes same radial orbital file is used for each NSUB:
+if (! -e radwin && -e ${tempd}_rad.dat ) cp ${tempd}_rad.dat radwin
+
+#AUTOS output files root label:
+set tempc = ${XX}${temp}
+
+
+#---------------------------------------------------------------------------------------------------
+
+#ARCHIVE an AUTOS structure run for this core excitation:
+
+#---------------------------------------------------------------------------------------------------
+
+                                                       if ( $RUN == "all" || $RUN == "struc" ) then
+
+if ( $WW == "Xn" ) then                                #need to edit X-file
+  if (! -e ${tempd}_str.dat ) then                     #tempd is what we want (e.g. CUP=ICR etc.)
+    set tempdt = ${WW}${ht}${YY}${DSS}                 #not set if $cup=""
+    if ( -e ${tempdt}_str.dat ) then                   #tempdt is what we have to read (e.g. CUP=IC etc.)
+      sed -e "s/CUP=${cup}/CUP=${cupr}/; s/CUP=${cupm}/CUP=${cupr}/" \
+              ${tempdt}_str.dat > ${tempd}_str.dat
+    else                                               #look for a base file
+      if ( -e ${tempb} ) then
+        set mxccfs = `sed -n -e 's/^.*MXCCF=\(-[0-9]*\).*$/\1/p' ${tempb}`          #strong quote for $
+        set mxccf = $mxccfs[1]                                                      #case multiple entries
+        set mxconfs = `sed -n -e 's/^.*MXCONF=\(-[0-9]*\).*$/\1/p' ${tempb}`        #strong quote for $
+        set mxconf = `echo $mxconfs | cut -c1-1`
+        if ( $mxconf != - ) then
+          sed -e "s/RUN='XX'/RUN='  '/; s/CUP='XX'/CUP='${C0}'/; s/MXCCF=${mxccf}/MXCCF=0/; s/PRINT='UNFORM'/PRINT='FORM'/" \
+                  ${tempb} > ${tempd}_str.dat
+        else
+          set mxconf = $mxconfs[1]                                                  #case multiple entries
+          if ( $mxconf <= -1000 ) then                 #Use first part of MXCONF for Ryd run
+            @ mx0 = - $mxconf / 1000000
+# echo "0: $mx0 "
+            @ mxc = $mxconf + $mx0 * 1000000
+# echo "c: $mxc "
+            @ mx1 = - $mxc / 1000
+# echo "1: $mx1 "
+            set dummy = `cat ${tempb} | grep "DROP4EQU"`    #just DROP4 if want RYD as well, and remove sed delete
+            if ( "${dummy}" != "" ) then                                            #Sum both parts of MXCONF
+              if ( $mx0 != 0 && $mx0 != $mx1 ) then
+                echo "***Error: inconsistent specification of MXCONF.le.1000 and DROP4EQU"
+                exit
+              endif
+              @ mx1 = $mx1 - ( $mxc + $mx1 * 1000 )
+# echo "1: $mx1 "
+            endif
+          else                                         #Shouldn't be, but...
+            @ mx1 = - $mxconf
+          endif
+          sed -e "s/RUN='XX'/RUN='  '/; s/CUP='XX'/CUP='${C0}'/; s/MXCONF=${mxconf}/MXCONF=${mx1}/; s/MXCCF=${mxccf}/MXCCF=0/; \
+                  s/PRINT='UNFORM'/PRINT='FORM'/; /DROP4RYD/d" ${tempb} > ${tempd}_str.dat
+        endif
+        if ( $Z0 != 0 ) cp ${tempd}_str.dat ${temp27r}
+      else
+        echo "***Error: missing AUTOS input file: ${tempd}_str.dat"
+        exit
+      endif
+    endif
+    cp ${tempd}_str.dat ${tempd}_str.bak
+  endif
+
+  if ( -e ${tempc}_str.dat ) rm ${tempc}_str.dat
+  sed -e "s/${labz1}/${labz2}/; s/${labnl1}/${labnl2}/; s/${lablam}/${LAMBDA}/" \
+          ${tempd}_str.dat > ${tempc}_str.dat
+  if ( -e ${tempd}_str.bak ) rm ${tempd}_str.dat       #else (any changes to) tempdt will be ignored on rerun
+  cp ${tempc}_str.dat das
+                                                       if ( $Z0 != 0 ) then
+  cp ${tempc}_str.dat ${temp27r}
+  echo " "
+  echo "adf27 file ${tempc}_str.dat archived in ${temp27r}"
+                                                       else
+  echo " "
+  echo "No RESTART required for structure run..."
+                                                       endif
+else
+  if ( -e ${tempc}_str.dat ) then
+    cp ${tempc}_str.dat das
+  else
+    echo "***Error: missing AUTOS input file: ${tempc}_str.dat"
+    exit
+  endif
+endif
+
+echo " "
+echo "Start AUTOS ${ZZ}-like $XX ${YY}${DSS} structure run"
+if ( -e olg${tempx}_str ) rm olg${tempx}_str
+if ( -e errlog ) rm errlog
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+/usr/bin/nohup $ASLMX <das >errlog                     # AUTOS structure run
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+if (! -e olg ) then
+  echo " "
+  echo "***Missing AUTOS executable: $ASLMX ?"
+  echo " "
+  exit
+endif 
+set dummy = `cat olg | grep "CPU"`
+echo " "
+echo "${dummy}"
+if ( -e errlog ) then
+  set dummy = `cat errlog | grep "ERROR"`
+  if ( "${dummy}" != "" ) then
+    echo " "
+    tail olg
+    echo " "
+    echo "${dummy}"
+    echo " "
+    echo "***Error in AUTOS structure run*** - see ${RDIR}/${ZZ}like/${XX}/${YY}${SS}/olg"
+    echo " "
+    exit
+  endif
+endif
+mv olg olg${tempx}_str
+if ( -e radout ) mv radout radial_str 
+echo " "
+echo "End AUTOS ${ZZ}-like $XX ${YY}${DSS} structure run"
+echo " "
+
+                                                       if ( $Z0 != 0 ) then
+if ( -e o${TCUP[1]} ) then                             #set target FORM or UNFORMATTED
+  set FRMS = 
+else
+  set FRMS = u
+endif
+
+set count = 1
+while ( $count <= $NCUP )
+  if ( -e o${TCUP[$count]}$FRMS ) mv o${TCUP[$count]}$FRMS o${CUP[$count]}${FRMS}_str
+  @ count = $count + 1
+end
+                                                       endif
+
+if ( $RUN == "struc" ) then
+  echo " "
+  echo "***Structure run ONLY, so exiting."
+  echo " "
+  exit
+endif
+#END structure run
+                                                       endif
+
+
+#Check we have TERMS and, maybe, LEVELS files:
+
+                                                       if ( $Z0 != 0 ) then
+set count = 1
+while ( $count <= $NCUP )
+  if ( $TCUP[$count] == "ca" ) set filec = "CAVES"
+  if ( $TCUP[$count] == "ls" ) set filec = "TERMS"
+  if ( $TCUP[$count] == "ic" ) set filec = "LEVELS" 
+  if (! -e ${filec} && $ZZ != "00" && $ZZ != "ur" ) then   #TBD?: if ( ${PP}=="RR" && $ZZ != "02" && $ZZ != "10" && $ZZ != "18" && $ZZ != "28" )
+    echo $ZZ
+    echo "***No ${filec} file found for target structure"  #If user runs pure closed n-shell "RR" then won't exist (allow for, TBD?)
+    exit
+  endif
+  @ count = $count + 1
+end
+                                                       endif
+
+#-----------------------------------------------------------------------------------------------------------------------------------
+
+#BEGIN AUTOS PP run for first (maybe only) sub-process of given core excitation e.g. 2-3,3:
+
+#-----------------------------------------------------------------------------------------------------------------------------------
+
+if ( $NSUB <= 0 ) then
+  echo "***Must set at least one NSUB sub-process"
+  exit
+endif
+
+set count = 1
+while ( $count <= $NSUB )
+
+                                                       if ( $SUB[$count] != 0 ) then
+
+set en = `echo $SUB[$count] | cut -c1-1`                              #check for Ryd run, or not
+if ( $en == "n" ) then
+  @ NPROCX = $NPROC - 1                                               #Ajust 1,2,...NPROC to 0,1,...NPROC-1
+else
+  @ NPROCX = -1
+  set en = ""                                                         #Don't need specific equiv value
+endif
+if (! -e $count ) mkdir $count 
+cd $count
+if ( -e ../radial_str ) cp ../radial_str radwin
+if ( -e ../${tempd}_rad.dat ) cp ../${tempd}_rad.dat radwin           #takes precedence
+if ( -e ../CAVES ) cp ../CAVES .
+if ( -e ../TERMS ) cp ../TERMS .
+if ( -e ../LEVELS ) cp ../LEVELS .
+
+#If link to restart file in $RDIR/${ZZ}like/$RESTD  user *WILL NEED MSTART* set in das file if Z0<0
+#
+set tempr = ${RDIR}/${ZZ}like/${RESTD}/${tempw}/$count
+
+if ( $Z0 == 0 ) then
+  set MSTRT = 1
+else
+  if ( $NPROCX < 0 ) then
+    set temprp = RESTART
+    if (! -e $temprp && -e ${tempr}/$temprp ) ln -s ${tempr}/$temprp $temprp
+  else
+    set pcount = 0
+    while ( $pcount <= $NPROCX )
+      if ( $pcount < 10 ) then
+        set np = 0${pcount}
+      else
+        set np = $pcount
+      endif
+      set temprp = RESTART${np}
+      if (! -e $temprp && -e ${tempr}/$temprp ) ln -s ${tempr}/$temprp $temprp
+      @ pcount = $pcount + 1
+    end
+  endif
+  if ( -e $temprp ) then
+    set MSTRT = 5
+  else
+    set MSTRT = 0
+  endif
+endif
+if ( $MSTRT != 0 ) echo "Switching-on RESTART for MSTART=${MSTRT}"
+
+set temp = ${CUP[$NCUP]}${YYD}${SUB[$count]}${DSS}                    #assume labelled by last scheme
+set tempsc = ${XX}${temp}
+set tempsd = ${WW}${temp}
+
+if ( $WW == "Xn" ) then                                               #need to edit X-file
+cd ..
+  if (! -e ${tempsd}.dat ) then                                       #tempsd is the CUP=ICR etc. we want
+    set tempsdt = ${WW}${ht}${YYD}${SUB[$count]}${DSS}                #tempsdt is CUP=IC etc.
+    if ( -e ${tempsdt}.dat ) then
+      sed -e "s/CUP=${cup}/CUP=${cupr}/; s/CUP=${cupm}/CUP=${cupr}/" \
+              ${tempsdt}.dat > ${tempsd}.dat
+    else                                                              #create tempsd from Xnbase file
+      if ( -e ${tempb} ) then
+        set mxconfs = `sed -n -e 's/^.*MXCONF=\(-[0-9]*\).*$/\1/p' ${tempb}`        #strong quote for $
+        set mxconf = `echo $mxconfs | cut -c1-1`
+        if ( $mxconf != - ) then
+          set tempbs = ${tempb}
+        else
+          set tempbs = ${XNB}_tmp
+          if ( -e ${tempbs} ) rm ${tempbs}
+          set dummy1 = `cat ${tempb} | grep "DROP4RYD"`
+          if ( "${dummy1}" != "" ) then
+            set dummy2 = `cat ${tempb} | grep "DROP4EQU"`
+            if ( "${dummy2}" != "" ) then                             #Can only have one flag present
+              echo "***Error: cannot have DROP4RYD and DROP4EQU flags in the same file"
+              exit
+            endif
+            set DROP = "DROP4RYD"
+            set tdrop = "n"
+          else
+            set dummy1 = `cat ${tempb} | grep "DROP4EQU"`
+            if ( "${dummy1}" != "" ) then
+              set DROP = "DROP4EQU"
+              set tdrop = ""
+            else
+              echo "***Error: MXCONF.lt.0 but no DROP4RYD or DROP4EQU flags found on file"
+              exit
+            endif
+          endif
+          set mxconf = $mxconfs[1]                                                  #case multiple entries
+          @ mx_nodrop = - $mxconf
+          if ( $mxconf <= -1000 ) then                                #Use different MXCONF for Ryd & equiv runs
+            @ mx0 = - $mxconf / 1000000
+# echo "0: $mx0 "
+            @ mxc = $mxconf + $mx0 * 1000000
+# echo "c: $mxc "
+            @ mx1 = - $mxc / 1000
+# echo "1: $mx1 "
+            @ mx2 = - ( $mxc + $mx1 * 1000 )
+# echo "2: $mx2 "
+            if ( $tdrop == "n" ) then
+              if ( $mx0 == 0 ) then
+                @ mx_drop = $mx1
+                @ mx_nodrop = $mx_drop + $mx2
+              else
+                @ mx_drop = $mx0 * 1000 + $mx1 - $mx0                 #Ryd only on mx1-mx0
+                @ mx_nodrop = $mx_drop + $mx2 * 1000
+#                @ mx_drop = $mx1                                      #Ryd+cont on mx1-mx0
+#                @ mx_nodrop = ( $mx0 + $mx2 ) * 1000 + $mx1 - $mx0    #un/comment as above
+              endif
+# echo "drop-n: $mx_drop "
+# echo "nodrop-n: $mx_nodrop "
+            else
+              if ( "${dummy1}" != "" && $mx0 != 0 && $mx0 != $mx1 ) then
+                echo "***Error: inconsistent specification of MXCONF.le.1000 and DROP4EQU"
+                exit
+              endif
+              @ mx_drop = $mx1
+              @ mx_nodrop = $mx_nodrop - $mx0 * 1000                  #Ryd only on mx2
+#              @ mx_nodrop = $mx_drop + $mx2                           #Ryd+cont on mx2
+# echo "drop: $mx_drop "
+# echo "nodrop: $mx_nodrop "
+            endif
+          else                                                        #or assume Common (no need to set <0 then)
+            if ( "${dummy1}" != "" ) then                             #but must set MXCONF.le.1000 if flag present
+              echo "***Error: must set MXCONF.le.1000 to flag drop for DROP4RYD or DROP4EQU"
+              exit
+            endif
+            @ mx_drop = - $mxconf                                     #o.k. as nothing gets deleted
+          endif
+          if ( $tdrop == $en ) then                                   #drop
+            sed -e "s/MXCONF=${mxconf}/MXCONF=${mx_drop}/; /${DROP}/d" ${tempb} > ${tempbs}
+          else                                                        #no drop
+            sed -e "s/MXCONF=${mxconf}/MXCONF=${mx_nodrop}/; s/${DROP}//" ${tempb} > ${tempbs}
+          endif
+        endif
+        set mxccfs = `sed -n -e 's/^.*MXCCF=\(-[0-9]*\).*$/\1/p' ${tempbs}`         #strong quote for $
+        set mxccf = `echo $mxccfs | cut -c1-1`
+        if ( $mxccf != - ) then
+          echo "***Error: ${tempb} file must be set with negative of required MXCCF (incl. -0 )."
+          exit
+        endif
+        set mxccf = $mxccfs[1]                                                      #case multiple entries
+        if ( $mxccf <= -1000 ) then                                   #Use different MXCCF for Ryd & equiv runs
+          @ mx1 = - $mxccf / 1000
+          @ mx2 = $mx1 - ( $mxccf + $mx1 * 1000 )
+        else                                                          #or Common
+          @ mx1 = - $mxccf
+          @ mx2 = - $mxccf
+        endif
+        if ( $en == "n" ) then                                        #Rydberg
+          if ( $PP == "RR" ) @ mx1 = $mxccf                           #re-set off
+          sed -e "s/RUN='XX'/RUN='${PP}'/; s/CUP='XX'/CUP='${C0}'/; s/MXCCF=${mxccf}/MXCCF=${mx1}/" \
+                  ${tempbs} > ${tempsd}.dat
+        else                                                          #equiv
+          sed -e "s/RUN='XX'/RUN='${PI}'/; s/CUP='XX'/CUP='${C0}'/; s/MXCCF=${mxccf}/MXCCF=${mx2}/" \
+                  ${tempbs} > ${tempsd}.dat
+        endif
+      else
+        echo "***Error: missing AUTOS input file: ${tempsd}.dat"
+        exit
+      endif
+      if ( $h == "h" ) then                                           #Try and ensure NMETAR/J set
+        if ( -e tmpqwertyuiop ) rm tmpqwertyuiop
+        set test = `sed -n -e 's/^.*NMETAR.*$/NMETAR/p' ${tempsd}.dat`
+        set test = `echo $test | cut -c1-1`                           #Do NOT combine with above!
+        if ( $test == "" ) then                                       #Nothing is present, so insert
+          sed -e "s/SMINIM/SMINIM NMETAR=0 NMETARJ=0 NRSLMX=10000/" \
+                  ${tempsd}.dat > tmpqwertyuiop
+          rm ${tempsd}.dat
+        else                                                          #Something there, re-set if off
+          mv ${tempsd}.dat tmpqwertyuiop
+        endif
+        sed -e "s/NMETAR=0/NMETAR=${META[1]}/; s/NMETARJ=0/NMETARJ=${META[2]}/; \
+                s/NRSLMX=10000/NRSLMX=${NRSLMX}/" tmpqwertyuiop > ${tempsd}.dat
+        rm tmpqwertyuiop
+      endif
+      if ( $Z0 != 0 ) cp ${tempsd}.dat ${temp27r}
+    endif
+    cp ${tempsd}.dat ${tempsd}.bak
+  endif
+
+  if ( -e ${tempsc}.dat ) rm ${tempsc}.dat
+  sed -e "s/MSTART=0/MSTART=${MSTRT}/; s/${labz1}/${labz2}/; s/${labnl1}/${labnl2}/; s/${lablam}/${LAMBDA}/" \
+          ${tempsd}.dat > ${tempsc}.dat
+  if ( -e ${tempsd}.bak ) rm ${tempsd}.dat                            #else (any changes to) tempsdt will be ignored on rerun
+                                                       if ( $Z0 != 0 ) then
+  cp ${tempsc}.dat ${temp27r}
+  echo " "
+  echo "adf27 file ${tempsc}.dat archived in ${temp27r}"
+                                                       endif
+cd $count
+endif
+
+if ( -e ../${tempsc}.dat ) then
+  cp ../${tempsc}.dat das
+else
+  echo "***Error: missing AUTOS input file: ${tempsc}.dat"
+  exit
+endif
+
+if ( -e oca ) rm oca
+if ( -e ols ) rm ols
+if ( -e oic ) rm oic
+if ( -e olg ) rm olg
+if ( -e olg000 ) rm olg000
+if ( -e errlog ) rm errlog
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+#
+# AUTOS run PP=DR,RR,PI,PE
+#
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+echo " "
+
+if ( $NPROCX < 0 ) then
+
+  echo "Start $PP AUTOS ${ZZ}-like $XX ${YYD}$SUB[$count]${DSS} serial run"
+
+  /usr/bin/nohup $ASLMX <das >errlog                   # Serial run <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+  if (! -e olg ) then
+    echo " "
+    echo "***Missing AUTOS executable: $ASLMX ?"
+    echo " "
+    exit
+  endif 
+
+  if ( -e errlog ) then                                #check for error messages
+    set dummy = `cat errlog | grep "ERROR"`
+    if ( "${dummy}" != "" ) then
+      echo " "
+      tail olg
+      echo " "
+      echo "${dummy}"
+      echo " "
+      echo "***Error in AUTOS run*** - see ${RDIR}/${ZZ}like/${XX}/${YY}${SS}/${count}/olg"
+      echo " "
+      exit
+    endif
+  endif
+
+  set dummy = `cat olg | grep "CPU"`
+  echo " "
+  echo "${dummy}"
+  mv olg olg${tempx}
+
+  echo " "
+  echo "End $PP AUTOS ${ZZ}-like $XX ${YYD}$SUB[$count]${DSS} serial run"
+
+else
+
+  echo "Start $PP AUTOS ${ZZ}-like $XX ${YYD}$SUB[$count]${DSS} parallel run using $NPROC processors"
+
+  $PASLM <das >errlog                                  # Parallel run <<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+  if (! -e olg000 ) then
+    echo " "
+    echo "***Missing AUTOS executable: $PASLM ?"
+    echo " "
+    exit
+  endif
+
+  if ( -e errlog ) then                                #check for error messages
+    set dummy = `cat errlog | grep "ERROR"`
+    if ( "${dummy}" != "" ) then
+      echo " "
+      tail olg000
+      echo " "
+      echo "${dummy}"
+      echo " "
+      echo "***Error in AUTOS run*** - see ${RDIR}/${ZZ}like/${XX}/${YY}${SS}/${count}/olg000"
+      echo " "
+      exit
+    endif
+  endif
+
+  set pcount = 0
+  while ( $pcount <= $NPROCX )
+      if ( $pcount < 10 ) then
+        set np = 0${pcount}
+      else
+        set np = $pcount
+      endif
+    set dummy = `cat olg0${np} | grep "CPU"`
+    echo " "
+    echo "${dummy}"
+    mv olg0${np} olg${tempx}0${np}
+    @ pcount = $pcount + 1
+  end
+
+  echo " "
+  echo "End $PP AUTOS ${ZZ}-like $XX ${YYD}$SUB[$count]${DSS} parallel run using $NPROC processors"
+
+endif
+
+echo " "
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+                                                       if ( $Z0 != 0 ) then
+set t1 = o${TCUP[1]}
+if ( -e $t1 || -e ${t1}00 || -e ${t1}00.00 ) then      #set FORM or UNFORMATTED
+  set FRM = 
+else
+  set FRM = u
+endif
+
+set ccount = 1                                         #archive rate files
+while ( $ccount <= $NCUP )
+  if ( $NPROCX < 0 ) then
+    mv o${TCUP[$ccount]}$FRM ../o${CUP[$ccount]}${FRM}_$count
+    if ( ${?OP} ) mv op${TCUP[$ccount]}${FRM} ../op${CUP[$ccount]}${FRM}_$count
+  else if ( $NSUB > $NSUB1 ) then                      #need to relabel - no parallel-nl
+    set pcount = 0
+    while ( $pcount <= $NPROCX )
+      if ( $pcount < 10 ) then
+        set np = 0${pcount}
+      else
+        set np = $pcount
+      endif
+      mv o${TCUP[$ccount]}${FRM}${np} ../o${CUP[$ccount]}${FRM}${np}_$count
+      if ( ${?OP} ) mv op${TCUP[$ccount]}${FRM}${np} ../op${CUP[$ccount]}${FRM}${np}_$count
+      @ pcount = $pcount + 1
+    end
+  else                                                 #for par-nl, catches par-l as well, no equiv run
+    mv o${TCUP[$ccount]}${FRM}* ..
+    if ( ${?OP} ) mv op${TCUP[$ccount]}${FRM}* ..
+    if ( -e n-mesh.dat ) mv n-mesh.dat ..
+  endif
+  @ ccount = $ccount + 1
+end
+                                                       endif
+
+cd ..
+                                                       endif
+
+@ count = $count + 1
+end
+#END sub-process loop for given core excitation 
+
+if ( $RUN == "autos" ) then
+  echo " "
+  echo "***AUTOS run ONLY, so exiting."
+  echo " "
+  exit
+endif
+#END AUTOS run
+                                                       endif
+
+if ( $Z0 == 0 ) then
+  echo " "
+  echo "***RESTART algebra run only, so exiting."
+  exit
+endif
+
+#---------------------------------------------------------------------------------------------------
+
+#Now process rates thru ADASPP:
+
+#---------------------------------------------------------------------------------------------------
+
+                                                       if ( $RUN == "all" || $RUN == $adaspp ) then
+
+if ( ${CUSR} != "" ) then                              #ADAS central
+  set temp28m = ${MDIR}/${adf28}/${pp}/${ZZ}like/${CUSR}
+else
+  set temp28m = ${MDIR}/${adf28}/${ZZ}like
+endif
+if ( -e ${temp28m} ) then
+  cp ${temp28m}/${WW}*${YY}* .                         #maybe nothing suitable there, but messy to test
+  if ( $WW == "Xn" ) then                              #archive specific ion file
+    if ( -e ${temp28m}/${XNB} ) then
+      cp ${temp28m}/${XNB} .
+    else
+      if ( -e ${XNB} ) mv ${XNB} ${XNB}.old            #don't want to pick-up old, esp das!
+    endif
+  endif
+else
+  if ( $WW != "Xn" ) then
+    echo "***Error: $ADASPP input directory not found: ${temp28m}"
+    exit
+  endif
+endif
+
+if ($RUN == $adaspp ) then
+  if ( -e o${CUP[1]}_str ) then                        #set target FORM or UNFORMATTED
+    set FRMS = 
+  else
+    set FRMS = u
+  endif
+  set t1 = o${CUP[1]}                                  #renamed
+  set t1u = ${t1}u
+  if ( -e ${t1}_1 || -e ${t1}00_1 ) then               #set FORM or UNFORMATTED
+    set FRM = 
+  else if ( -e ${t1u}_1 || -e ${t1u}00_1 ) then
+    set FRM = u
+  else
+    set t1 = o${TCUP[1]}                               #original name (parallel only)
+    if ( -e ${t1}00 || -e ${t1}00.00 ) then            #set FORM or UNFORMATTED
+      set FRM = 
+    else                                               #default UNFORMATTED
+      set FRM = u
+    endif
+  endif
+endif
+
+#Loop over coupling schemes:
+
+set ccount = 1
+while ( $ccount <= $NCUP )
+
+set tempc = ${XX}${CUP[$ccount]}${YY}${DSS}            #separate files for ca,ls,ic(r)
+set tempd = ${WW}${CUP[$ccount]}${YY}${DSS}            #N.B. not YYD
+
+
+if ( $WW == "Xn" ) then                                #archive specific ion file
+  if (! -e ${tempd}.dat ) then
+    set tempdt = ${WW}${h}${TCUP[$ccount]}${YY}${DSS}
+    if ( -e ${tempdt}.dat ) then
+      cp ${tempdt}.dat ${tempd}.dat                    #IC=ICR here so just relabel
+    else
+      if (! -e ${XNB} ) then
+        echo "/XX/" >${XNB}
+        if ( $PP == "DR" ) then
+          echo " &ONE NTAR1=0 NTAR2=0 COREX='Y-Y' IMATCH=1 &END" >>${XNB}
+        else if ( $PP == "RR" ) then
+          echo " &ONE NTAR1=0 NTAR2=0 &END" >>${XNB}
+        else
+          echo " Script Xnbase file generation not yet coded for $PP "
+          exit
+        endif
+        echo " &TWO &END" >>${XNB}
+        cp ${XNB} ${XNB}.bak
+      endif
+      set T0 = `echo $TCUP[$ccount] | tr "[a-z]" "[A-Z]" `
+      sed -e "s:/XX/:/${T0}/:; s/'Y-Y'/'${Y1}-${Y2}'/; s/NTAR1=0/NTAR1=${META[$ccount]}/" \
+              ${XNB} > ${tempd}.dat
+      if ( -e ${XNB}.bak ) rm ${XNB}
+      if ( $h == "h" ) then                            #-NTAR2 is the MAX number of final parent configs
+        mv ${tempd}.dat tmpqwertyuiop
+        sed -e "s/NTAR2=0/NTAR2=-100/" tmpqwertyuiop > ${tempd}.dat
+      else if ( $PP == "RR" ) then
+        mv ${tempd}.dat tmpqwertyuiop
+        sed -e "s/NTAR2=0//" tmpqwertyuiop > ${tempd}.dat
+      else if ( $PP != "DR" ) then
+        echo " Script Xnbase file generation not yet coded for $PP "
+        exit
+      endif
+      if ( -e tmpqwertyuiop ) rm tmpqwertyuiop
+      cp ${tempd}.dat ${temp28r}
+    endif
+    cp ${tempd}.dat ${tempd}.bak
+  endif
+  if ( $PP == "DR" || $PP == "RR" ) then               #set any type, 3 only for explicit extension
+    if ( $ITYPE == "3" || $ITYPE == "5" ) then
+      mv ${tempd}.dat tmpqwertyuiop
+      sed -e "s/TWO/TWO ITYPE=${ITYPE0}/" tmpqwertyuiop > ${tempd}.dat
+      rm tmpqwertyuiop
+    endif
+  endif
+
+  if ( -e ${tempc}.dat ) rm ${tempc}.dat
+  if ( $ZZ == "ur" || $ZZ == "00" ) then               #bare ion (RR only) TBD?: need filec check for closed n-shell
+    if ( $PP != "RR" ) then
+      echo " Bare ion X-file completion not yet coded for $PP "
+      exit
+    endif
+    set tempo = op${CUP[$ccount]}${FRM}_1
+    if ( -e $tempo ) then
+      cp ${tempd}.dat ${tempc}.dat                     #we have an AS PI file (e.g. ICR)
+    else                                               #pure "top-up"
+      sed -e "s/NTAR1/NZ=${Z0} NTAR1/" ${tempd}.dat > ${tempc}.dat    #to non-rel h-like
+    endif
+    if ( $TCUP[$ccount] == "ca" ) then
+      echo "        1 0    1          0.000000  " >>${tempc}.dat
+      echo "        0 0    0         -0.000000  " >>${tempc}.dat
+#    else
+    else if ( $TCUP[$ccount] == "ls" ) then
+      echo " 1 0 0    1    1          0.000000  " >>${tempc}.dat
+      echo " 0 0 0    0    0         -0.000000  " >>${tempc}.dat
+#    else
+    else if ( $TCUP[$ccount] == "ic" ) then
+      echo " 0 0   1 0    1    1        0.00000000  " >>${tempc}.dat
+      echo " 0 0   0 0    0    0       -0.00000000  " >>${tempc}.dat
+    endif
+  else                                                 #combine X-file header with target
+    if ( $TCUP[$ccount] == "ca" ) set filec = "CAVES"
+    if ( $TCUP[$ccount] == "ls" ) set filec = "TERMS"
+    if ( $TCUP[$ccount] == "ic" ) set filec = "LEVELS"
+    if ( -e ${filec} ) then
+      sed -e '/^$/d; /ENERGY/d' ${tempd}.dat ${filec} > ${tempc}.dat
+    else
+      echo "***Error: $ADASPP target ${filec} file not found"
+      exit
+    endif
+  endif
+  if ( -e ${tempd}.bak ) rm ${tempd}.dat
+  set tempo = ${XX}${TCUP[$ccount]}${YY}               #just label by ca,ls,ic (no h/r)
+  if ( -e ${temp28m}/${tempo}_obs.dat ) then           #tack-on observed energies (only used by DR/PE)
+    cp ${temp28m}/${tempo}_obs.dat .
+    mv ${tempc}.dat adasin
+    cat adasin ${tempo}_obs.dat > ${tempc}.dat
+#    mv ${tempo}_obs.dat ${tempo}_obs.dat.bak
+  else
+    set tempo = ${XX}${TCUP[$ccount]}r${YY}
+    if ( -e ${temp28m}/${tempo}_obs.dat ) then
+      echo "***Error: observed energy file coupling label should be only ca/ls/ic, not ${tempo}_obs.dat, i.e. no 'r'"
+      exit
+    endif
+    set tempo = ${XX}h${TCUP[$ccount]}${YY}
+    if ( -e ${temp28m}/${tempo}_obs.dat ) then
+      echo "***Error: observed energy file coupling label should be only ca/ls/ic, not ${tempo}_obs.dat, i.e. no 'h'"
+      exit
+    endif
+    set tempo = ${XX}h${TCUP[$ccount]}r${YY}
+    if ( -e ${temp28m}/${tempo}_obs.dat ) then
+      echo "***Error: observed energy file coupling label should be only ca/ls/ic, not ${tempo}_obs.dat, i.e. no 'h' or 'r'"
+      exit
+    endif
+  endif
+  cp ${tempc}.dat adasin
+  cp ${tempc}.dat ${temp28r}
+  echo " "
+  echo "adf28 file ${tempc}.dat archived in ${temp28r}"
+else
+  if ( -e ${tempc}.dat ) then
+    cp ${tempc}.dat adasin
+  else
+    echo "***Error: missing $ADASPP input file: ${tempc}.dat"
+    exit
+  endif
+endif
+
+set count = 1
+set pccount = 1
+while ( $count <= $NSUB )
+  set en = `echo $SUB[$count] | cut -c1-1`                            #check for Ryd run, or not
+  if ( $en == "n" ) then
+    @ NPROCX = $NPROC - 1                                             #Ajust 1,2,...NPROC to 0,1,...NPROC-1
+  else
+    @ NPROCX = -1
+  endif
+  if ( $NPROCX < 0 ) then
+    if ( $SUB[$count] == 0 && ! -e o${CUP[$ccount]}${FRM}_${count} ) then
+      echo "Skipped sub-process files must now exist for $ADASPP post-processing!"
+      exit
+    endif
+    set tempo = o${CUP[$ccount]}${FRM}_${count}
+    if ( -e $tempo ) mv $tempo o${pccount}${FRM}
+    if ( ${?OP} ) then
+      set tempo = op${CUP[$ccount]}${FRM}_${count}
+      if ( -e $tempo ) mv $tempo op${pccount}${FRM}
+    endif
+    @ pccount = $pccount + 1
+  else if ( $NSUB > $NSUB1 ) then                      #need to relabel
+    set pcount = 0
+    while ( $pcount <= $NPROCX )
+      if ( $pcount < 10 ) then
+        set np = 0${pcount}
+      else
+        set np = $pcount
+      endif
+      set tempo = o${CUP[$ccount]}${FRM}${np}_$count
+      if ( -e $tempo ) mv $tempo o${pccount}${FRM}
+      if ( ${?OP} ) then
+        set tempo = op${CUP[$ccount]}${FRM}${np}_$count
+        if ( -e $tempo ) mv $tempo op${pccount}${FRM}
+      endif
+      @ pcount = $pcount + 1
+      @ pccount = $pccount + 1
+    end
+  endif 
+  @ count = $count + 1
+end
+
+set temps = o${CUP[$ccount]}${FRMS}_str
+if ( -e $temps ) mv $temps o${FRMS}_str                #case hybrid
+
+echo " "
+echo "Start $ADASPP ${ZZ}-like $XX ${YY}${DSS}  ${CUP[$ccount]}-run"
+if ( -e adasout ) rm adasout
+if ( -e errlog ) rm errlog
+if ( -e $adfpp ) rm $adfpp
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+/usr/bin/nohup $ADASPPX <adasin >errlog                # ADASPP run
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+set count = 1
+set pccount = 1
+while ( $count <= $NSUB )
+  set en = `echo $SUB[$count] | cut -c1-1`                            #check for Ryd run, or not
+  if ( $en == "n" ) then
+    @ NPROCX = $NPROC - 1                                             #Ajust 1,2,...NPROC to 0,1,...NPROC-1
+  else
+    @ NPROCX = -1
+  endif
+  if ( $NPROCX < 0 ) then
+    set tempo = o${pccount}${FRM}
+    if ( -e $tempo ) mv $tempo o${CUP[$ccount]}${FRM}_${count}
+    if ( ${?OP} ) then
+      set tempo = op${pccount}${FRM}
+      if ( -e $tempo ) mv $tempo op${CUP[$ccount]}${FRM}_${count}
+    endif
+    @ pccount = $pccount + 1
+  else if ( $NSUB > $NSUB1 ) then                      #need to relabel
+    set pcount = 0
+    while ( $pcount <= $NPROCX )
+      if ( $pcount < 10 ) then
+        set np = 0${pcount}
+      else
+        set np = $pcount
+      endif
+      set tempo = o${pccount}${FRM}
+      if ( -e $tempo ) mv $tempo o${CUP[$ccount]}${FRM}${np}_$count
+      if ( ${?OP} ) then
+        set tempo = op${pccount}${FRM}
+        if ( -e $tempo ) mv $tempo op${CUP[$ccount]}${FRM}${np}_$count
+      endif
+      @ pcount = $pcount + 1
+      @ pccount = $pccount + 1
+    end
+  endif 
+  @ count = $count + 1
+end
+if ( -e o${FRMS}_str ) mv o${FRMS}_str $temps          #case hybrid
+
+if (! -e adasout ) then
+  echo " "
+  echo "***Missing $ADASPP executable: $ADASPPX ?"
+  echo " "
+  exit
+endif 
+set dummy = `cat adasout | grep "CPU"`
+echo " "
+echo "${dummy}"
+set dummy = `cat errlog | grep "ERROR"`
+if ( "${dummy}" != "" ) then
+  echo " "
+  tail adasout
+  echo " "
+  echo "${dummy}"
+  echo " "
+  echo "***Error in $ADASPP run*** - see ${RDIR}/${ZZ}like/${XX}/${YY}${SS}/adasout"
+  echo " "
+  exit
+endif
+echo " "
+echo "End $ADASPP ${ZZ}-like $XX ${YY}${DSS}  ${CUP[$ccount]}-run"
+echo " "
+
+mv adasout adasout_${CUP[$ccount]}
+
+if ( $adfpp == "adf38" ) then                          #PE
+  cat ${adfpp}l ${adfpp}r > $adfpp
+#  rm ${adfpp}l ${adfpp}r                              #or
+  mv ${adfpp}l ${adfpp}l.${SS}_${CUP[$ccount]}         #hold for move to OP archive
+  mv ${adfpp}r ${adfpp}r.${SS}_${CUP[$ccount]}         #hold for move to OP archive
+else if ( $adfpp == "adf39" ) then                     #PI (archive partials and, maybe, totals)
+  if( $tx != "" ) then
+    set tempt = ${USR}${YR}"#"${ZZ}_${tempc}"_"${tx}.dat
+    if ( -e $tempt ) rm $tempt
+    cat ${adfpp}l ${adfpp}tx > $tempt
+    rm ${adfpp}tx
+  endif
+  if( $px != "" ) then
+    set tempt = ${USR}${YR}"#"${ZZ}_${tempc}"_"${px}.dat
+    if ( -e $tempt ) rm $tempt
+    cat ${adfpp}l ${adfpp}px > $tempt
+  else                                                 #always archive partials
+    cat ${adfpp}l ${adfpp}px > $adfpp
+  endif
+#  rm ${adfpp}l ${adfpp}px                             #or
+  mv ${adfpp}l ${adfpp}l.${SS}_${CUP[$ccount]}         #hold for move to OP archive
+  mv ${adfpp}px ${adfpp}px.${SS}_${CUP[$ccount]}       #hold for move to OP archive
+endif
+
+if ( -e $adfpp ) mv $adfpp ${USR}${YR}"#"${ZZ}_${tempc}${ttype}.dat
+
+if ( $PP == "DR" || $PP == "RR" ) then                 #can give T3 & T5
+  if ( -e ${adfpp}_3 ) mv ${adfpp}_3 ${USR}${YR}"#"${ZZ}_${tempc}_t3.dat
+  if ( -e ${adfpp}_5 ) mv ${adfpp}_5 ${USR}${YR}"#"${ZZ}_${tempc}_t5.dat
+endif
+
+@ ccount = $ccount + 1
+
+end
+
+                                                       endif
+
+#------------------------------------------------------------------------------------
+
+#Fit and Archive FIT files (for final coupling scheme only):
+
+#------------------------------------------------------------------------------------
+
+                                                       if ( $CFITX != "" && ( $RUN == "all" || $RUN == $adaspp || $RUN == "fit" ) ) then
+
+if ( -e adasout_${CUP[$NCUP]} ) then
+ cp adasout_${CUP[$NCUP]} adasout
+else
+ echo "***Error: missing $CFITX input file: adasout_${CUP[$NCUP]}"
+ exit
+endif
+
+set t1 = `echo ${XX} | cut -c1`                        #label by element only
+set t3 = `echo $t1 | tr "[:lower:]" "[:upper:]"`
+set t2 = `echo ${XX} | cut -c2`
+set n2 =
+set count = 1
+while ( $count < 10 )
+  if ( $t2 == $count )  set n2 = $count
+  @ count = $count + 1
+end
+if ( $n2 == "" ) set t3 = ${t3}${t2}
+
+echo " "
+echo "Start Fitting"
+if ( -e cfin ) rm cfin
+if ( -e errlog ) rm errlog
+
+set mcount = 1
+while ( $mcount <= ${META[$NCUP]} )
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+/usr/bin/nohup echo $mcount | $CFITX  >>! errlog
+
+#<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<
+
+  mv cfout cfout_${mcount}_${t3}
+
+  @ mcount = $mcount + 1
+end
+
+mv cfin cfin_${t3}
+rm adasout
+
+set dummy = `cat errlog | grep "ERROR"`
+
+#if ( "${dummy}" == "" ) then
+
+  if (! -e ${RDIR}/FITS ) mkdir ${RDIR}/FITS
+  set tempf = ${RDIR}/FITS/${ZZ}like
+  if (! -e ${tempf} ) mkdir ${tempf}
+  if ( ${tempf}/${CUSR} != "" && ! -e ${tempf}/${CUSR} ) mkdir ${tempf}/${CUSR}
+
+  mv cfin_${t3} ${tempf}/${CUSR}
+  mv cfout_*_${t3} ${tempf}/${CUSR}
+
+  echo " "
+  if ( "${dummy}" != "" ) cat errlog
+  echo "Fitting coefficients archived in ${tempf}"
+  echo " "
+#else
+#  cat errlog
+#  echo " "
+#  echo "***Fitting coefficients NOT calculated"
+#  echo " "
+#endif
+echo " "
+echo "End Fitting"
+
+                                                       endif
+
+#------------------------------------------------------------------------------------
+
+#Archive adfpp outfiles:
+
+#------------------------------------------------------------------------------------
+
+                                                       if ( $RUN == "all" || $RUN == $adaspp ) then
+
+if (! -e ${RDIR}/${adfpp} ) mkdir ${RDIR}/${adfpp}
+set tempp = ${RDIR}/${adfpp}/${ZZ}like
+if (! -e ${tempp} ) mkdir ${tempp}
+mv ${USR}*.dat ${tempp}
+echo " "
+echo "${adfpp} files archived in  ${tempp}"
+
+                                                       endif
+
+#------------------------------------------------------------------------------------
+
+#Various degrees of clean-up:
+
+#------------------------------------------------------------------------------------
+
+if ( $CLEAN != "" ) then
+  echo " "
+  echo "Start Cleaning"
+endif
+#clean-up rate files only
+if ( $CLEAN == "rates" ) then
+  if ( $NPROC <= 0 || $NSUB > $NSUB1 ) then            #files were relabelled - no parallel-nl
+    set count = 1
+    while ( $count <= $NSUB )
+      rm *_${count}
+      @ count = $count + 1
+    end
+  else                                                 #for par-nl
+    rm o*.*
+  endif
+  echo " "
+  echo "Rate files removed."
+  echo " "
+endif
+#remove all files in ZZlike/XX/YY                                
+if ( $CLEAN == "all" ) then
+  rm -rf *    
+  echo " "
+  echo "ALL non-archive files removed."
+  echo " "
+endif                       
+
+echo " "
+echo "-------------------------------------------------------------"
+echo "End $PP run for seq ${ZZ}-like, ion $XX $LABT ${YY}${DSS}"
+echo "-------------------------------------------------------------"
+echo " "
+
