@@ -1,0 +1,63 @@
+      PROGRAM SVS                                                   ! 10/03/05
+      IMPLICIT REAL*8 (A-H,O-Z)
+C
+C EVALUATE DR FITS OF SHULL & VAN STEENBERG ET AL, APJSS V48 PP95-107 (1982),
+C ALSO USED BY ARNAUD & ROTHENFLUG AASS V60, 425-57 (1985) 
+C AND MATTIOLI EUR-CEA-FC-1346 (1988)
+C
+C ADD NZA: .GT. 0 USES ADAS Z-SCALED TEMPS, .LT.0 USER INPUT TEMP RANGE
+C
+      PARAMETER (NDIM28=19)
+      PARAMETER (CONEV=8.61042E-5)
+C
+      DIMENSION THTIC(NDIM28)
+      DATA
+     XTHTIC/1.0E1,2.0E1,5.0E1,1.0E2,2.0E2,5.0E2,1.0E3,2.0E3,5.0E3,1.0E4
+     X    ,2.0E4,5.0E4,1.0E5,2.0E5,5.0E5,1.0E6,2.0E6,5.0E6,1.0E7/
+C
+      OPEN(5,FILE='svsin')
+      OPEN(6,FILE='gout')
+C
+      READ(5,*) NZA,A,B,T0,T1
+C
+      IF(NZA.LT.0)THEN
+   5    WRITE(*,*)'INPUT NO T, TMIN, TMAX (WITH TEMPS IN KELVIN)'
+        READ(*,*)NT,TMIN,TMAX
+        IF(NT.LE.0.)STOP 'BYE'
+C
+        IF(NT.GT.1)THEN
+          TMAX=LOG10(TMAX)
+          TMIN=LOG10(TMIN)
+          DT=(TMAX-TMIN)/(NT-1)
+        ELSE
+          DT=0.0
+        ENDIF
+C
+        DO I=1,NT
+          TT=(I-1)*DT+TMIN
+          TT=10**TT
+          ADR=A*EXP(-T0/TT)*(1.0+B*EXP(-T1/TT))
+          ADR=ADR/SQRT(TT**3)
+C
+c          WRITE(*,*)'TEMP= ',TT,'  RATE COEF.= ',ADR
+          WRITE(6,200)TT,ADR
+        ENDDO
+        GO TO 5
+      ELSE
+        WRITE(6,731)
+        NZA2=NZA*NZA
+        DO I=1,NDIM28
+          TT=NZA2*THTIC(I)
+          TEMP=CONEV*TT
+          ADR=A*EXP(-T0/TT)*(1.0+B*EXP(-T1/TT))
+          ADR=ADR/SQRT(TT**3)
+          WRITE(6,732)TT,ADR,TEMP
+        ENDDO
+      ENDIF
+C
+ 200  FORMAT(1P2D10.2)
+ 731  FORMAT(//'    T(K) ',4X,'ADR(TOT)',4X,' T(EV)')
+ 732  FORMAT(1PE10.2,2(1X,E10.2))
+C
+      END
+
