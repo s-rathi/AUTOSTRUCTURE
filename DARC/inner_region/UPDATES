@@ -1,0 +1,41 @@
+                            DARC UPDATE LOG
+
+27/08/09 stg2d NRB
+Fix GENSUM INTEGER*4 bug (was already "known" - sigh**2).
+
+26/08/09 stg2d NRB
+Fix NJGRAF bug in CUTNL (was already "known" - sigh).
+
+25/08/09 stg2d NRB
+Comment-out last references to INTCC (no longer used) so that it can
+compile under Fortran77.
+
+20/08/09 stg2d NRB
+Restrict N+1 correlation function generation to those formed by the
+first -NCFGP NR CSFs. Default, all, unchanged.
+
+26/05/08 stg1d_orb v12.3 NRB
+Additional checks.
+
+22/05/08 stg1d_int v12.1 NRB
+Added ITC(50) defining dimension test. Basically skips INTD2, which
+is where all the time goes in DRMPS (calculating the C-C Slater integrals).
+Minor tweaks/speed-ups introduced.
+
+19/05/08 stg0d v12.1 NRB
+Version 0.9 is default, no write of TARGET.SH is default (GRASP dump
+was, and is, MCDF.DAT). None interactive version available for batch runs.
+
+12/05/08 stg1d_orb v12.3 NRB
+Minor fixes and tidy-up.
+
+12/05/08 stg1d_orb v12.3 NRB
+Minor mods. This version reproduces Poet-Temkin results for H of RMPS.
+Non-DRMPS operation did not work (obviously so) in v12.2 - now fixed.
+
+27/03/08 stg1d_orb v12.2 NRB
+Now correctly recovers original surface amplitudes and e-energies.
+
+24/03/08 stg1d_orb v12.1 NRB
+First implementation of new orthogonalization routine for combining continuum 
+basis with L-spinor basis.
