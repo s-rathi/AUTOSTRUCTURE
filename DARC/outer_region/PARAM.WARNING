@@ -1,0 +1,11 @@
+#
+# ******** WARNING, THE FOLLOWING VARIABLES ARE INFLATIONARY! VIZ
+#
+#
+#  MZMEG*1000000            IN STGF, STGFDAMP, STGBF0DAMP
+#  2*(MZMNP+MZCHF)*MZNRG    IN STGFDAMP, STGBF0DAMP
+#  (MZMNP+MZCHF)*MZDEC      IN STGFDAMP, STGBF0DAMP
+#  MZMNP*MZCHF              IN STGFDAMP, STGBF0DAMP
+#  MZMSH*MZPHT              IN STGBF0DAMP
+#
+#***********************************************************************
