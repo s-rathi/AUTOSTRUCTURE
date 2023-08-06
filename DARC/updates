@@ -1,0 +1,3863 @@
+This file contains a running commentary on updates to all R-matrix related codes
+
+                                                           - maintained by NRB -
+
+
+13/04/22 stgicf (4.6), stgicfdamp (4.6)
+***************************************
+FDIP (top-up) routines were called for all J for printing CC vs CBe partial omegas,
+despite default print level being off.
+This could be problematic for fine energy mesh and/or low-J (FDIP2 failure).
+Only call FDIP now if print level asks for it or if it is actually required for top-up.
+Could still cause a problem on the coarse energy mesh, if unlucky.
+Overflow in FDIP2 is now trapped.
+*** stgf suite only ever called FDIP when top-up was required.
+*** TBD: update stgf suite's FDIP2, for safety.
+
+29/06/21
+********
+Removed tabs. Incremented all version numbers.
+
+07/10/20 stgb (2.20), stgbb (2.7), stgbf (2.16)
+***********************************************
+Deeply-closed channels coding introduced in
+16/06/97 stgb (2.10) did not pass outer-region channel normalization XVECT to the B-files.
+Consequently, 
+09/07/97 stgbf (2.7) was incorrectly normalized for such deeply-closed channels
+19/11/99 stgbb (2.6) was incorrectly normalized for such deeply-closed channels
+from there-on until now. (Earlier versions just zeroed-out such channels.)
+stgb now passes XVECT on an existing record so older/other codes ignore it.
+Also, stgbb,stgbf check for presence of XVECT and if not found (old B-files)
+then zero-out any deeply-channels in the outer region. 
+Note, stgb cannot zero-out such channels without crashing if MZPTS & AC allow
+a sufficiently large RTWO. This the reason for moving-in. (And to include such
+outer-region contributions.)
+N.B. Dates are approx, versions are not.
+
+23/10/19 stgicf (4.5), stgicfdamp (4.5)
+***************************************
+Attempt to correct JMNTWO (22/06/19) was incorrect.
+If JMNTWO was correct and even, fine. But it tried to change it if was odd and correct.
+
+16/10/19 stgicf (4.5), stgicfdamp (4.5)
+***************************************
+Fixed bug (mixed type in intrinsic MOD) which caused gfortran to fail to compile,
+introduced by previous fix 22/06/19.
+
+22/06/19 stgicf (4.5), stgicfdamp (4.5)
+***************************************
+Attempt to correct JMNTWO if mis-aligned with total spin viz one half-integer the other integer.
+
+20/06/19 omgmrg.f
+*****************
+Now checks that symmetries match. omadd does this, but is needed in omgmrg as well
+so as to catch a mis-match between AUTOSTRUCTURE OMGINF file and R-matrix OMEGA.
+
+18/06/19 omadd.f
+****************
+Missed a de-allocate when points being dropped.
+
+12/06/19 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+If user sets MZLMX=2, as they should, to reduce memory (since stgf by default only
+includes dipole & quadrupole perturbing potentials) then LS top-up in large-L will fail
+because a secondary dimension is using MZLMX to "determine" the max target orbital l.
+Now "hardwired" for a max l=4 and quietly drop any higher. This top-up in large-L is
+v. small and not done in the level resolved case.
+
+08/06/19 stg2r 3.7
+******************
+Suppress false *** WARNING: MIXED EXCHANGE & NON-EXCHANGE RUN! in RELOP='TCC' run.
+
+04/06/19 omadd.f
+****************
+Coding below only worked if infinite energy point was on file1 (array out of bounds.)
+
+09/01/19 Utility codes
+**********************
+All web-based utility codes which process the OMEGA file:
+om2omu.f, omu2om.f, omr2omc.f, omc2omr.f, omgmrg.f, omgmrgp.f, omadd.f, 
+omorder.f (= omreduce.f), omgcmp.f, omsumps.f, xtrct.f
+are now fully allocatable, all dimensions determined by OMEGA.
+
+Also, treatment of non-default elastic transitions has been made consistent throughout
+the suite, at least as far is as possible for codes with no user input, see below. 
+If the number of transitions has been restricted by the user (beyond +/- elastic)
+and elastic is not default, then user must flag so. Currently, this is not possible for 
+om2omu.f, omu2om.f, omr2omc.f, omc2omr.f - so don't restrict if you need to use these!
+
+13/12/18 stg1r (1.4)
+********************
+Changed LAMAX default from 2*MAXLA to LAMAX=2 since p/stgf default is to ignore .gt.2.
+Helpful for R-matrix script since it does not set LAMAX explicitly. For codes
+compiled with MZLMX=2, p/stg2/3/r ignore .gt. 2, but p/stg1/r does not, of course.
+
+07/12/18 stgicf (4.5), stgicfdamp (4.5)
+***************************************
+Broke-up an IF statement (in sr.rdlsne) into two parts, for compilers
+that accessed the second part even when the first part terminated the IF
+(the second part has array out of bounds if evaluated then).
+
+17/08/18 adasexj 3.17
+*********************
+Did not correctly copy header of CA adf04_om to adf04_ups - AS CADW.
+
+18/08/17 stgicf (4.5), stgicfdamp (4.5)
+***************************************
+Default TCC operation "changed" so that the term energies in TCCDW.DAT are
+always matched against those in term.dat so as to determine the CC terms.
+Previously, the user had to edit TCCDW.DAT to flag such, e.g. for use with 
+CC terms interspersed with CI/correlation terms. Only all CC below all CI
+was automatic since energies in term.dat not read by default, only the 
+number of CC terms. Since energy matching is not an issue (or should not be)
+since both files use energies determined by R-matrix, "unnecessary" matching
+when all CC below CI is outweighed by being able to handle the mixed case
+without user intervention, i.e. can  be used more generally with R-matrix
+Script - see related KCUT development below.
+Note, if for some reason, the user wants to revert to ignoring term.dat energies,
+remove term.dat file and enter its no. of CC terms (NTLS) as NTLSRD in TCCDW.DAT.
+
+17/08/17 stgjk 2.28
+*******************
+KCUT selection did not work correctly on more complex cases.
+
+16/08/17 stg2r 3.7
+******************
+MSYM(MZNC1->MZTAR) array out of bounds, only when writing term energies case TCC/BP
+(as NAST gets expanded to all), but could overwrite memory...
+
+24/07/17 stgjk 2.28
+*******************
+Added KCUT (and TOLB) option to &STGJB as per stg2.
+
+24/07/17 stg2r 3.7
+******************
+Updated to work correctly with RELOP="TCC" - CI expansion gets expanded to become CC,
+but minimal user list is the necessary symmetries, as before, i.e. KCUT has no effect.
+
+20/07/17 stg2r 3.7
+******************
+If correlation (CI) terms lie below spectroscopic CC terms then the user has to
+specify their skipping, either individually via ISKIP, or via energy ranges
+such as ESKPL, ESKPH, ECORR. This can be tedious.
+In addition, the R-matrix script uses the AS KCUT to flag a CC config subset
+of the full CI expansion. This writes only the CC terms to TERMS which is then
+used to construct dstg2. This "assumes" that ALL spec. (CC) terms lie below
+ALL correlation terms, of same symmetry. If not, stgicf likely will give an
+error, but BPRM...
+Now, if user (or script) sets the AS KCUT in the dstg2 NAMELIST STG2B then
+sr.stg2rd assumes the TERMS file has been used to construct the symmetry list
+in dstg2 and also reads the target energies (and the preceding two
+intger columns - free-formatted). The CC terms are then selected in sr.bound
+by matching to the energies in TERMS of the same symmetry, to within TOLB Ryd,
+which the user can adjust as necessary - default = 5.e-4 Ryd.
+This all assumes that the configuration number is a good quantum number.
+Occasionally, AS flags a TERM as correlation (and v.v.) which it clearly
+is not - it sits amongst a sea of spectroscopic. The user then must edit
+dstg2 manually to correct.
+Any ISKIP data is ignored - just list the term energies you want!
+
+28/06/17 adasexj 3.16
+*********************
+Made dimension test operation INTEGER*8.
+
+24/02/17 stg1r
+**************
+Generate B-B and B-C dipole polarization integrals (SR.ONEELE) for non-core
+(i.e. non-B&W) orbitals - previously, only C-C were evaluated.
+
+20/02/17 stg1r/stg2r/stgjk/stg3r
+********************************
+Pass MAXNCB through to all (inner) stages, for test purposes - serial only.
+
+08/02/17 stg1r/stg2r/stgjk
+**************************
+TEC version now on web - see below.
+(Delayed as had not been ported into the parallel codes until recently.)
+
+12/10/16 stg2r 3.6
+******************
+Flag direct access usage (memory need) in sr.setmx1. Previously, only
+sr.chektp usage (for RK.DAT) was flagged.
+
+07/04/15 adasexj 3.16
+*********************
+Factor 2 missing from characteristic temperature of Juttner relativistic 
+correction to Maxwellian distribution: Ryd vs a.u.
+
+07/04/15 stgbf0damp (4.7)
+*************************
+Minor (TWG): clarified comments about continuum normalization and
+corresponding PI coefficient. Use a more accurate value for the 
+fine-structure constant, overall coefficient changes by <0.1%.
+
+13/02/15 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+28/10/14 development could go into an infinite loop for l=0: RZERO/2 got reset
+to RZERO and could not satisfy .lt. RZERO/3 to go no further after RZERO/4.
+This reset occurred when the phase was ~zero and the code attempted to use
+a large step - not particularly numerically accurate either. Now ensure new
+start is not reset so, and limit "large" step to improve accuracy in such cases.
+
+04/11/14 stg3r (3.5)
+********************
+Buttle correction to dipole matrices: ABUT* and BBUT* (*=L and V).
+Original coding of DMAT is consistent with their use by prebf.
+When someone split this into DMAT, DMAT1 (original DMAT) and DMAT2, the
+roles of ABUT and BBUT got reversed in DMAT2 wrt the the original DMAT
+(now DMAT1) operation and their WRITE in the new DMAT.
+To handle this, reverse ABUT and BBUT in the CALL DMAT2.
+This changes the content of the Dnm files!
+Note, a different approach is taken for the parallel implementation (pstgd_dip).
+Unlike EIE, the Buttle correction to the dipole matrices is small - the
+original work by Yu Yan predated DMAT2. In fact, the role reversal of
+ABUT and BBUT (essentially applying the initial state Buttle correction
+to the final state and vice versa) does not change the size of the effect.
+Only prebf (for stgbf) has the capability to use these dipole corrections.
+Because they are small, (OP) production work omited them.
+The radiation damped codes cannot make any use of them - the reads simply 
+skip over them.
+
+28/10/14 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+Case MQDT, large box, if s and c function series evaluation fails to converge
+then moves inside box to 1.2*RINF (inner turning point), but for l>0 only. 
+For l=0, went to RZERO/2. If really large box then this is too large still
+e.g. half an n=8 box is still larger than an n=5 box. Now allow for a 
+second halving if first fails to converge, i.e. tries RZERO/4, but no more.
+
+Note on non-MQDT operation with large box: when closed channel outer region
+(theta) solution is too large for outer region grid (i.e. outer turning point 
+.gt. "MZPTS") determines s and c at RZERO and forms theta from appropriate
+lin. comb. prior to outward integration if needed (PERT='YES'). BUT, if
+s and c fail to converge (likely!) does *NOT* move inside box (different coding)
+and so drops channel. So, ensure MZPTS large enough to determine all
+"necessary" n. E.g. 1200 is likely not enough points, 10000 is better (slower).
+
+For an n=5 box there should be sufficient convergence of s and c for these
+points not to be an issue.
+
+23/10/14 stg2r 3.5
+******************
+Added ISHFTLS.ne.0 to ensure e-vectors are written, needed for TECs in stgjk.
+
+07/10/14 adasexj 3.16
+*********************
+Minor: do not attempt to determine forbidden high energy behaviour when 
+collision strength is identically zero. (IRMPS=-1 was workaround.)
+
+16/09/14 stgicf (4.4), stgicfdamp (4.4)
+***************************************
+Attempt to fix long standing problem of synchronizing non/ordering of
+near degenerate terms betweem TCCDW.DAT and term.dat (i.e. TCCs and K-matrices).
+SR.ORDER does not re-order if within 1.D-7, but this was a.u. in the inner region
+and Ryd in the outer region. Now compensated-for. 
+Exact degeneracy (to 7 d.p.) was/is not a problem, and so remains a manual fix.
+
+26/08/14 adasexj 3.13-15
+************************
+Relativistic Juttner correction factor applied to electron distribution 
+if IREL.ne.0. (Default=0, off.)
+Can read, interpolate and convolute AS-DW/PWB type-5 files, if detected.
+Default binned energy mesh adjusted to be (i) more efficient for small
+resonance regions (ii) more accurate at low-T, esp. for small kappa.
+No longer writes a file called "adf04", rather adf04_om and/or adf04_ups,
+as appropriate.
+Forbidden transitions default returned to 1/E^alpha extrapolation.
+(alpha=2 was forced to avoid additional source differences when
+comparing binned/non-binned etc.)
+Numerous other (under the bonnet) improvements.
+
+01/08/14 adasexj 3.10-12
+************************
+If XDRY.gt.1 then use Druyvesteyn distribution, instead of the default Maxwellian.
+
+17/07/14 adasexj 3.8/9
+**********************
+If KAPPA.gt.1.5 then use a Kappa distribution, instead of the default Maxwellian.
+
+12/07/14 adasexj 3.7
+********************
+NSTATES.LT.0 enables read (back in) of a (type 5) binned collision strength adf04 file.
+(Ideally, written by adasexj...) Currently, the actual value is not used, just the sign.
+(It needs NBIN=0, the default, since this flags what is to be calculated and written, 
+not what is being read.)
+Only the NAMELIST is read. Any of the "usual" subsequent data is ignored, currently.
+This development removes any dependence on the original OMEGA file, which can be siloed. 
+It reads from adf04_om (so mv adf04 adf04_om) and writes to adf04_ups (sound familiar?)
+Note, all bin energies are now chosen pre-rounded to 3 s.f. so that no error is
+introduced into the bin widths on reading the bin energies. (So, do not read a
+binned adf04 file written by an earlier version, e.g. 3.5.)
+Not averaging (the binned collision strengths) over the bin width in the first
+place is an alternative strategy, but then if someone does a quadrature on
+the tabulated "collision strengths"...
+
+03/07/14 adasexj 3.x (x=1-6)
+****************************
+Generates an adf04 file of binned collision strengths, from an RM OMEGA
+file, at a set of final (scattered electron) bin energies (so, type 5).
+Default (NBIN=0) gives the usual convoluted upsilons without binning.
+Set |NBIN|.NE.0 for the binned output.  
+NBIN.LT.0 usefully, in addition, loops back-up and convolutes 
+the binned collision strengths, and writes them to the end of the same adf04 file,
+after the binned data. You can then compare with the NBIN=0 run.
+If you use NBIN=+1 or -1 to bin then the code resets |NBIN| to a reasonable value.
+
+A likely suitable energy mesh is set-up by default (STC):
+
+C     NBIN    -- .GT. 0 NUMBER OF LOGARITHMIC SPACED BIN ENERGIES.
+C                .LT. 0 LOOP BACK-UP AND CONVOLUTE BINNED (NBIN=-NBIN).
+C                IF |NBIN| .LT. 10 THEN INTERNALLY RESET TO 101.
+C                DEFAULT: 0 (NO BINNED DATA)
+C
+C     EMIN,MAX-- ENERGY RANGE OF NBIN.
+C                DEFAULTS: TKADAS(1)/5, ENAST(NSTATES) (UNSCALED RYD)
+C
+C     NLIN    -- NUMBER OF LINEARLY SPACED BIN ENERGIES TO FOLLOW LOG.
+C                DEFAULT: INITIALLY, ALL ALLOWED BY DIMENSION. THIS IS 
+C                         REDUCED SUBSEQUENTLY WHEN THE LAST ENERGY IS
+C                         KNOWN FROM THE omega FILE.
+C
+C     DELIN   -- LINEAR STEP.
+C                DEFAULT: THE LAST STEP OF THE LOG BIN ENERGIES.
+C
+C     MAXE    -- FINAL BIN ENERGY. ONLY USED IF DELIN.EQ.0.
+C                DEFAULT: 0 (NOT USED THEN)
+
+See comments at start of code for further details.
+
+23/06/14 adasexj 2.x ( x=1-11)
+******************************
+Complete rewrite. Removed all legacy code (e.g. least squares fits).
+Can reproduce default results of v1.11. Non-standard energy meshes may
+give somewhat different results for high-T forbidden transitions.
+Present results equally valid.
+Added NLOWMN, NLOWMX, NUPMN, NUPMX -- can be used to restrict output
+to a subset of transitions from lower states between
+NLOWMN & NLOWMX to upper states between NUPMN & NUPMX.
+Default: all inelastic.
+Merged adasex branching. Flag LS via ITCC=-1.
+
+20/05/14 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+An unfortunate user choice of MINLT in BP/DARC operation
+could cause all 2J.gt.MINLT to be omitted.
+Basically, 11-20 (non-MQDT) or 16-30 (MQDT), for default ISKP0.
+
+12/03/14 stgjk (2.36)
+*********************
+Implement AS TEC operation (ISHFTLS etc).
+
+18/12/13 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+Use theta for hybrid MQDT for NU.lt.FNUHYB, not just .AND.NU.lt.L.
+FNUHYB.gt.0 now sets appropriate value for IOMSW.
+FNUMIN only operates on S & C QDT channels, not theta.
+
+24/09/13 adasexj (1.11)
+***********************
+Fixes for pure algebraic jK-recoupling (ITCC=0).
+
+18/09/13 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+Fixes for MQDT operation: do not step too far inside the box else
+integrating away from c-function divergence; do not switch to
+K-matrix pert too soon - low channel-l can occur on high total-L
+in complex atoms.
+
+24/07/13 stgicf (4.4), stgicfdamp (4.4)
+***************************************
+Added TOLCC option to drop TCCs involving CC terms whose abs value.lt.TOLCC.
+(All TCCs are automatically dropped involving terms only in the CI expansion.)
+
+19/07/13 stgicf (4.4), stgicfdamp (4.4)
+***************************************
+Added new BLAS coding to MQDTK,TMTRIX & ZMQDTK,ZSMTRX. (Increases memory
+somewhat, see notes in said routines if need to revert.)
+
+26/06/13 stgjk (2.25)
+*********************
+Wrong dimension tested in COPYTP: AIJ is MZNC1, not MXNC1.
+
+25/06/13 stgfdamp (4.7), stgbf0damp (4.7)
+******************************************
+BLAS version now uses DGEMM in SR.RINIT (as stgf below, 20/06/13).
+Also SR.ZMQDTK and SR.PIABSK (stgbf0damp).
+***Note: a BLAS version of SR.ZRMAT has also been implemented, but not fully
+tested and so it is not part of the public distribution (guinea pigs welcome.)
+
+25/06/13 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+SR.PETKMX and PETTMX now have BLAS coding for all IPERT/IQDT options.
+Also, switch DSYMM to DGEMM since we are not using the other half matrix
+for anything and the later is maybe 20% faster (it seems) likely due
+to simpler accesing of memory in the (full) matrix multiplcation, which
+is carried-out by both of course.
+
+21/06/13 stgf (4.8)
+*******************
+Further BLAS code for matrix multiply in SR.MQDTK.
+
+20/06/13 stgf (4.8)
+*******************
+BLAS version now uses DGEMM in SR.RINIT (like parallel) now that
+DGEMM is called repeatedly to carry-out half-matrix multiply by
+sub-block - do not need full WMAT transpose now. 
+DGEMM from highly optimized libraries is much faster (>>2) than DDOT or 
+DGEMV which can explicitly do the half-matrix multiply only.
+
+16/06/13 stgf (4.8), stgfdamp (4.7), stgbf0damp (4.7)
+*****************************************************
+***IMPORTANT: the size of present day R-matrix calculations often
+leads to much larger box sizes than was historic. The determination
+of outer region solutions from Coulomb series at the box increasingly
+fails. This is particularly true for MQDT operation. The previous
+default was to drop channels for such failures as they were deemed
+to be deeply closed (i.e. classically forbidden). Now, the 09/10/08
+option is the *default*, i.e. for such cases, move inside the box, where
+starting values can be determined and Numerov out to the box boundary. 
+This is controlled by the IOMSW parameter.
+Old defaults: IOMSW=1  (IQDT.gt.0, i.e. MQDT) IOMSW=0  (IQDT.le.0, i.e. non-MQDT)
+New defaults: IOMSW=11 (IQDT.gt.0, i.e. MQDT) IOMSW=10 (IQDT.le.0, i.e. non-MQDT)
+
+14/06/13 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+Catch an extreme case of overflow in MQDT long-range integerals.
+
+12/06/13 hmerge
+***************
+Re-vamped H.DAT concatenation program to handle an arbitrary mixture
+of H-files with or without headers, allow user to extract a subset
+of symmetries via IPWINIT, IPWFINAL and restrict the long range
+multipoles via LAMAX. 
+Also fixed a bug (from PJS) when surface amplitudes were split - 
+output H.DAT was flagged incorrectly because the split was "removed".
+Now, any split is passed thru unchanged, and flagged correctly.
+
+06/06/13 stgicfdamp.f (4.4)
+***************************
+Gailitis average was (always) incorrect for transitions from excited states.
+Attempt to catch pathological case of complex diagonalization of identity,
+used in Gailitis average.
+If DR was switched-on (non default) then electron-impact excitation cross
+sections were wrong - would not normally do this since the two processes
+optimally use very different energy meshes.  
+
+06/06/13 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+Attempt to catch pathological case of complex diagonalization of identity,
+used in Gailitis average.
+
+23/05/13 stgf (4.7)
+*******************
+Fix for SR.THETA generating negative Wronskian, case nu.lt.l+1.
+
+27/03/13 omadd.f (1.12)
+***********************
+If IDROP in use, then infinite energy point on FILE1 was lost. (Obvious failure.)
+
+25/03/13 stg2r.f (3.5)
+**********************
+RELOP='TCC' gave incorrect message about a mixed exchange and non-exchange run,
+when IDWOUT=2.
+
+15/03/13 omadd.f (1.12)
+***********************
+Now test for any mis-match between file2 and file1 energy meshes.
+(File2 must span file1.) Introduce IDROP for user (>0) or code (<0)
+to drop |IDROP| final energy points, excluding any infinite energy.
+
+07/03/13 stg1r (2.39)
+*********************
+Trivial: BASORB/FINDEE error message gave incorrect n-value to be
+treated as Lagrange orthogonalization.
+
+08/11/11 adasexj (1.10), adasex (1.9)
+*************************************
+25/08/10 update did not work for new style (short) config strings. (KB)
+	
+10/05/11  omgmrgp.f, omgmrg.f, omu2om.f, omadd.f, omc2omr.f
+***********************************************************
+If E0=ENAT(2) in stgf suite then may or may not get a threshold collision
+strength, depending on round-off. Post-processors assume present. This
+causes unformatted columnwise read to fail. Added "err=" to escape
+gracefully. But best to start E0 half an energy step below ENAT(2).
+
+07/01/11 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+The 26/02/09 update for IMESH=3 now means that IMESH=3 prunes near-threshold
+energies by default for neutrals (as case IMESH=1). This is likely desirable,
+but there was no facility for the experienced/foolish user to override because
+ABVTHR and BELTHR (=0 effectively switches-off pruning) was (only) in the /MESH1/
+NAMELIST. Now added to /MESH3/. IMESH=2 does not need to prune, by definition.
+
+04/11/10 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+Array out-of-bounds if multipole dimension (MZLMX) less than no. input (LAMAX).
+This was caused by attempt to limit reads rather than stop, as in the past.
+
+25/08/10 adasexj (1.10), adasex (1.9)
+*************************************
+The configurations in the adasex/j.in.form support files were not Eissner or 
+Standard Configuration format. This means that automatic ADAS processing 
+was not possible. For adf04 to be integrated seamlessly with ADAS, changed 
+AS configuration format write to Standard. Modified adasex/j.f so that they 
+could read new style (as well as old style still) including extended range, 
+which they couldn't do before. They just write what they read i.e. they
+do not covert old style to new. (Also, ported in the irates option from CPB.)
+
+27/07/10 stgbf0damp (4.6)
+*************************
+Port from parallel code for consistancy.
+
+20/06/10 stgbf0damp (4.6)
+*************************
+Tweak tolerances for MQDT to try and cope with breakdown of 
+deeply-closded channel representation when Auger damping present.
+
+20/06/10 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+Do not interpolate when IEQ=-1. (Unnecessary problems with IOMIT.)
+
+21/05/10 stgf (4.7)
+*******************
+Minor.
+
+21/05/10 stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************
+Floating point exception (divide by zero) for NTYP2OR radiation
+for deeply closed channels - effective quantum number <0.5 was
+rounded down to integer 0 - now skip.
+
+10/04/10 stgicf (4.3)
+*********************
+Elastic collision strengths "obviously" wrong.
+
+16/02/10 stgicfdamp_blas (4.3)
+******************************
+A user set WORK*8 array for a BLAS routine should have been ZWORK*16. 
+Once the number of open-channels was greater than half-dimensioned
+(NMCJ/2) then memory went out of bounds (but not array bounds).
+
+08/10/09 stg2r (3.5), stglib (2.13)
+***********************************
+Bug in LNOEX=-1 which affected monopole transitions.
+
+04/09/09 stg1r (2.30) stg2r (3.5)
+*********************************
+Allow LNOEX=-1 flag to switch-off all cont-cont exchange Slater interactions.
+If used at low-L, bound-cont 1- and 2-body interations are NOT switched-off.
+Best set in STG1B. Should only use MINLT, in STG2B, such that there are
+no bound-bound and bound-continuum contributions anyway (as is the case
+for the explict NX codes.)
+
+02/09/09 stg2r (3.5)
+********************
+For total L .gt. LNOEX in LS-coupling, neglect exchange and form only
+the diagonal sub-blocks of the (N+1)-electron Hamiltonian for each
+target spin, since the off-diagonal blocks which couple different target
+spins for a given total spin are identically zero. (This mimics
+the behaviour of the explicit NX codes, without the heavy disc I/O.)
+Save for the highest total/target spin, the sub-blocks are roughly
+a factor of two smaller since only one, not two, target spins need
+to be considered. (The highest total spin was always "small" because
+only one target spin can contribute.) The total spin is flagged .lt. 0
+as in the NX case. stg3r is transparent to this. stgf picks it up as
+with the NX codes. So, stgicf requires INOEXCH=1 to be set, as per NX,
+since it must re-construct the complete K-matrix for spin-orbit mixing.
+("Obviously", exchange and non-exchange symmetries cannot be mixed 
+in the same stg2r run for stgicf.)
+
+01/09/09 stg1r (2.39), stg2r (3.5), stglib (2.13)
+*************************************************
+Added LNOEX (the maximum exchange lambda multipole) to stg1r (&STG1B) 
+and slightly, but critically, adjusted the usage of the corresponding
+variable in stg2r/stglib. Previously, if exchange integrals were
+"dropped" in stg1r due to inaccuracy, they were in fact merely zeroed-out.
+Memory was set aside to index/store them and their zero-value written to file.
+If LNOEX was set in stg2r, independent of whether they had been dropped
+in stg1r, then exchange multipoles were explicitly dropped in stg2r -
+no angular algebra was determined for them. Now, if LNOEX is set in
+stg1r then exchange multipole (integrals) .gt. LNOEX are explicitly
+never indexed, stored or written to file, and this value of LNOEX
+is passed to stg2r. stg2r now checks for consistency between LNOEX
+in stg2r and stg1r, but only if LNOEX was set in stg1r. 
+Thus, IF you set LNOEX (in the new stg1r!) you MUST update stg2r *AND*
+stglib (because stglib is where LNOEX is used, and LNOEX was interpreted 
+slightly differently there because of its original introduction
+in association with STGDW and IDWOUT.) Otherwise, the codes are backwards
+compatible. Note, for a given total orbital angular momentum L, then
+the exchange multipoles are L, L+/-1,... So, dropping exchange multipoles
+.gt. LNOEX is approximately the same as dropping exchange at L .gt. LNOEX.
+(Since exchange should be negligible when it is dropped, the presence or
+absence of a multipole or two either side of LNOEX is ignorable. In the
+case of STGDW it was implemented more rigorously. CC has hijacked LNOEX,
+but its usage differs slightly from DW hence the slight hand-waving.
+The root issue is the fact that Slater integrals are computed independent
+of total L, as indeed is the initial angular algebra before its recoupling,
+i.e. the total L is not known when the decision to in/exclude is made.)
+
+27/08/09 stglib (2.13)
+**********************
+Fix GENSUM INTEGER*4 bug (carry-over from DARC).
+
+12/08/09 stg1nx.f (1.11)
+************************
+Trivial format expansion for large dimension problems.
+
+26/02/09 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+For IMESH=3, implement same set-up as IMESH=1 for MQDT: case when
+a fine mesh is generated externally, rather than the odd (coarse)
+energy, as per MCW's "tree" method.
+
+22/12/08 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+Fix for case where initial step H is zero (divide by zero).
+
+15/12/08 stgb (2.19)
+********************
+Read blocked WMAT from pstg3r. 
+
+28/11/08 stg2nx (1.11)
+**********************
+FINDER failed to find basis orbital with correct nodes for large box size.
+Re-sync'ed with stg1r FINDER which did work.
+
+09/10/08 stgf (4.7), stgfdamp (4.6), stgbf0damp (4.6)
+*****************************************************
+For deeply closed-channels, series solution of unphysical s- and c-functions
+can fail to converge at RZERO (especially K-shell holes) and these channels
+are then omitted from MQDT operation. Now, code can move inwards and try again
+and if converged Numerov back out to RZERO. This is the new default operation
+for stgbf0damp with Auger damping - which is the only case where it has
+been noticed to make a difference so far - else operates as before in stgf etc.
+Can switch-on the new operation elsewise by setting IOMSW=11,10,-11 instead
+of 1,0,-1, respectively. "Recall", IOMSW=1 is default (except stgbf0damp now
+where it is 11, when IAUGER.gt.0) which drops MQDT channels with nu.lt.l.
+IOMSW=0 (or 10) attempts to include nu.lt.l, but this can (eventually) run into
+linear dependence problems and so there is the hybrid method (IOMSW=-1,-11).
+See Gorczyca and Badnell JPB v33, pp2511-23 (2000) for a detailed study.
+***It is not recommended that the user change MOD(IOMSW,10) from the default.
+
+
+09/10/08 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Archive accumulated changes.
+
+
+10/08/08 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Output DARC K-mx for differential code. 
+
+01/08/08 stg1r v2.38
+********************
+Keith (KAB) intoduced FINDEE in v2.37 for cases where FINDER failed.
+But, FINDEE did not check for correct number of nodes.
+
+07/07/08 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+A do-loop indexing bug was introduced into ZRMAT on first moving from v4.2 to 
+v4.3 datestamped 22/03/04 and was still present in all v4.4 and the early v4.5. 
+A partial correction was made to v4.5 dated 14/01/06. It has now been 
+fully-corrected and reproduces v4.2 results. Prior to the first correction, 
+the bug led to array out-of-bounds. Post first, could lead to broad false 
+(NTYP2I) DR/PI resonance(s) - the effect on corresponding excitation was just 
+the wiping out of an isolated resonance.
+
+26/06/08 stg1r (2.38)
+*********************
+Re-instated Keith's development for accurate treatment of high-L exchange
+intgerals by RS [JPB39, 3873 (2006)] after fixing the B&W crash cause - see
+18/03/07.
+
+10/06/08 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Compare QETEST with EINCR (coarse) for extreme cases (need QETEST<EINCR).
+Minor mods for use with DARC.
+
+30/05/08 stg3r (3.4)
+********************
+Fix longstanding problem of inconsistency between ORDER acting on
+target energies and channel energies when they are near degenerate,
+within the tolerance of ORDER for not swapping. Only ORDER on target
+energies, then sum over channel ang. mom. to determine channel order.
+Occurs for hydrogenic pseudostate problem, work around was to set
+targets at 1.e-6 separation. (Note, first attempt of 28/05 was wrong.)
+
+21/05/08 stg3r (3.4)
+********************
+Make DSYEVD the default LAPACK diagonalizer as DSYEVR fails IEEEOK test
+with optimized compiler libraries more often these days, or so it seems
+(e.g. SUN, AMD).
+
+06/05/08 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+Attempt to switch-off NTYP1 damping in classically forbidden region, 
+where MQDT then gives false "resonance". This is a fix, not a solution.
+
+02/05/08 stg3r (3.4)
+********************
+Allow pseudo-resonance transformation reduction matrices to overflow
+to disc (dipole operation needs them all) for small memory processors,
+e.g. on parallel machines.
+
+01/05/08 stg3r (3.3)
+********************
+Buttle correction to orbitals (for dipole matrix) was transformed incorrectly
+by pseudo-resonance elimination code. DMAT/DMAT2P now re-worked so that
+a separate DMAT2 is no longer necessary memorywise. But will be retained
+while DMAT2P is still being tested (altered) so that non-pseudo-state
+dipole problem is not (accidently) affected.
+
+
+30/04/08 stg3r (3.3)
+********************
+Rename the new DMAT2 as DMAT2P and only enter for dipole pseudo-resonance
+elimination and revert to original DMAT2 elsewise. Then, dimensions
+associated with DMAT2P (nsizea, nsizeh) can be set as small as desired,
+even =1 if not in use. Note, Hamiltionian pseudo-resonance elimination
+does NOT use (nsizea, nsizeh), rather it uses the maximal dimensions, and 
+so can still be used (even for large cases) independent of the dipole code.
+
+30/04/08 stg3r (3.2)
+********************
+Array out of bounds when processing dipoles with no pseudo-resonance
+elimination, following addition of Tom's dipole pseudo-resonance elimination 
+coding. Has a large memory requirement, even when not being used - under
+investigation to reduce.
+
+25/04/08 stgbf0damp (4.5)
+*************************
+PIABSS failure (no inverse found) eliminated.
+
+25/04/08 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+The BLAS version of stgfdamp,stgbf0damp did not work for PERT='YES'
+Should have given complete nonsense for results.
+
+19/04/08 adasexj (1.9), adasex (1.8)
+************************************
+ILOW=1 (default) determination of high energy behaviour of forbidden
+transitions (those for which no limit point exists) used an absolute
+number of points to separate the two energies examined. Obviously,
+it really is a function of the coarse mesh step. If a very coarse
+step was used then code stopped unnecessarily. Of course, a very coarse
+step may not be advisable (numerical failure, quadrature accuracy)
+but this is not the place to stop. Also, not going to high enough
+energy could result in too few points. But, again, the catch should
+be, and is, on the highest temperature requested for said energies.
+Now, within reason, just steps back one-third of highest finite energy,
+as it did before, but does not stop unless absolutely too few points, <10.
+
+23/11/07 stg3r (3.2)
+********************
+Added a STOP if stg2 symmetries were incorrectly ordered for Tom's dipole 
+pseudo-resonance elimination. Also, LAPACK version missed a symmetry
+update in TAPERD (dipole pseudo. elimin. only.)
+
+21/11/07  stgfdamp (4.5), stgbf0damp (4.5)
+******************************************
+For IQDT.LE.0, NTYP2OF damping is not explicitly evaluated at every energy step,
+for speed, rather a scaled quantity was calculated on a coarse energy mesh and 
+extrapolated on the fine energy mesh. This could give rise to small sawtooth
+features in the recombination cross section. It has been replaced by
+linear interpolation, and the sawtooths disappear in the test case.
+(Initiated by Tom and Dragan, at WMU.)
+
+06/11/07 stg3r (3.2)
+********************
+Added Tom's dipole pseudo-resonance elimination coding - see DMAT2.
+
+28/08/07 stgjk (2.25)
+*********************
+TCCDW.DAT was unreadable when number of CI terms exceeded 999.
+
+10/07/07 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Did not correctly skip read of long-range multipole coefficients when
+memory exceeded (LAMAX.gt.MZLMX).
+
+23/05/07 omadd.f (1.11)
+***********************
+Set IEMIN and/or IEMAX to extract omegas for the range of energies specified
+by these energy indexes (IE). If IBIG=1 then the infinite energy point
+will still be retained. A normal complete i.e. OMEGA/U file is the output,
+but with MXE adjusted to the new number of reduced energies represented.
+
+18/03/07 stg1r (2.38) -> (2.37)
+*******************************
+Revert back to previous version of stg1r for now as KAB's change of 11/01/07
+crashes B&W.
+
+21/02/07 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+Number of real expansion coefficients for theta was overwritten by the
+number of complex expansion coefficients for ztheta (same number 99.9%
+of the time). Only used by non-MQDT (IQDT=0), normal MQDT operation
+(IQDT>0) unaffected.
+
+22/01/07 stgb (2.19)
+********************
+Scale determinant so as to avoid overflow.
+
+17/01/07 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+COUL: case weakly closed-channel set large RTWO and open channel with
+RINF.gt.RZERO then radial function tabulation exceeded dimension MZPTS
+(also started open-channel inward integration at unnecessarily large RTWO).
+Only likely encountered with (large) RMPS calculation.
+
+15/01/07 stgjk (2.25)
+*********************
+Did not catch all changes to SPINBB - KAB now checked.
+
+13/01/07 stgjk (2.25)
+*********************
+KAB/PJS: Phase saga continues. Reverse prime and unprime in BSPNO.
+First "reversed" in early 1995. SPINOR then put back to original in late 1995.
+So, BSPNO (and SPINOR) are now back to where they were late 1994/early 1995.
+***BUT, CALL SETUPE(MZ,MX, interchanges MX,MZ in SPINBB.
+Note, NRB/PJS fixed RECUD back in late 2002.
+
+11/01/07 stg1r (2.38)
+*********************
+KAB's treatment of high L exchange added (by Keith) [JPB 39, 3873 (2006)].
+
+06/11/06 stgb (2.19)
+********************
+Add and correct BLAS routine usage.
+
+02/11/06 stgb (2.19)
+********************
+Re-arrange expressions involving determinant so as to avoid overflow
+(e.g. deta*detb/detc - deta*(detb/detc)).
+
+30/05/06 grasp0, stg2d
+**********************
+TNSRJJ bug-fix from Charlotte Froese Fischer (also in pstg2d).
+
+14/02/06 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Read blocked WMAT from pstg3r. 
+
+10/02/06 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+Bug in neutral damping - divide by zero (TWG).
+
+27/01/06 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Allow IDIP=1 to write strength.dat independently of IPRKM.
+
+14/01/06 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+Loop index error in ZRMAT. O.K. if not array out of bounds.
+***07/07/08 UPDATE. 
+This bug was introduced on moving from v4.2 to v4.3 22/03/04.
+However, this 14/01/06 fix is NOT complete, it corrected the upper
+bound of the do-loop but not the lower one. 
+This was corrected in v4.5 on 07/07/08.
+
+
+05/10/05 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+"Obvious" conflict (not to SUN compiler) between use of CC, CCP as
+array and non-array.
+
+28/09/05 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Again, F-file C-function not defined correctly when low-L follows
+high-L (because INOUT not set and so picks-up old value).
+
+05/09/05 stgf (4.6), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+IRAD>0 (write of F-files for stgbf, stgff) S-function not determined
+(undefined) at second point (RZERO+H) when point of inflection (RINF)
+moves outside of RZERO,  - spotted by MJS.
+
+03/09/05 stg1r (2.37)
+*********************
+KAB's new SR.FINDEE mods for "difficult" cases where BASORB fails
+to find the correct number of nodes.
+
+01/09/05 stg1r (2.37)
+*********************
+Bug in new dielectric polarization potential, ONE not defined.
+
+01/09/05 stg1r (2.37), stg2r (3.4), stg3r (3.1)
+***********************************************
+Minor, for NAG compiler.
+
+12/08/05 stgff (1.8)
+********************
+Signs wrong in converting from K- to S-matrix in DTOT.
+
+09/08/05 stg1r (2.37)
+*********************
+Re-implemented dielectric polarization potential, controlled by
+ALFD, RCUT and IPOLFN (=1, Norcross, =2, Baylis).
+
+09/08/05 stgff (1.8)
+********************
+Renamed SR.MATMUL to SR.MXMUL to avoid linkage warnings or, for some
+compilers, failure.
+
+08/08/05 stgff (1.8)
+********************
+Phase check (re-)instated in SR.AB for jK-coupling. Was suppressed
+because could not get it to agree with inner region R-matrix. Problem
+was RECUPD uses initial state odd parity and final state even parity,
+but LS (STG2D) uses initial state even parity and final state odd
+parity (as does STGFF), so needed an extra factor (-1)**(J-J').
+
+05/08/05 stgd (1.9)
+*******************
+Top-up extended to jK-coupling.
+
+05/08/05 stgff (1.8)
+********************
+MJS changed output to BF.L-LP files to Z-scaled line strength (was a
+quasi-cross section).
+
+04/08/05 stgd (1.8)
+*******************
+Extended to jK-coupling for Breit-Pauli runs. 
+(N.B. jj-coupling for a DARC run is not coded, ditto for stgff.)
+
+03/08/05 stgd (1.7), stgff (1.8)
+********************************
+First "public" release for testing of the line broadening/damping codes.
+stgff has been extensively re-written taking into account efficiencies
+implemented in other outer region codes. It has also been extended to
+neutral atoms and jK-coupling.
+stgd has been completely restructured and now runs as a follow-on to
+a stgf run (with IPRKM=5), as opposed to standalone from H.DAT.
+This enables one to make use of the current stgf, including for neutrals.
+stgd is currently LS-coupling only (jK-coupling being worked-on).
+BOTH CODES SHOULD ONLY BE USED FOR PARTIALS, AS THERE ARE ISSUES TO
+BE RESOLVED WITH TOP-UP.
+
+
+02/08/05 stgf (4.6)
+*******************
+IPRKM=5 writes elastic (physical) S-matrices to (direct access) files SNM
+for STGD damping constant code. (N.B. stgf only, i.e. undamped serial - but
+inc. BLAS.)
+
+12/07/05 stgicf 4.3 stgicfdamp 4.3
+**********************************
+Set IPRINT.LT.0 to suppress writes to screen (default 0).
+
+02/07/05 stgicfdamp 4.3
+***********************
+Introduce IREADK to specify reading of real K-mx (IREADK.lt.0). This enables
+real exchange K-matrices, which are only Auger damped, to be read. (NX real
+K-mx read was always possible via INOEXCH.LT.0; this is still present and
+any conflict with IREADK is tested-for.) Note, there was a bug in the
+commented-out code to read and store multiple energy real exchange K-mx files 
+NOT split by symmetry (not serial default).
+
+20/05/05 stg1r (2.36)
+*********************
+STOP if MZNR2 or MZLR2 dimensions exceeded. NRANG2 (MAXC) or LRANG2 (MAXLT)
+were previously reduced instead. This was confusing to novice users.
+
+09/05/05 stg1nx 1.11
+********************
+There was a bug in TENSOR - it did not take account of seniority in testing 
+whether the spectator shells are orthogonal. Both L and S of each shell were 
+checked as identical in the two configurations but not seniority.  
+The error can only occur in the special case where the two configurations are 
+identical in each spectator shell except that the seniority in a shell differs. 
+If you are not using configs of the form 3d^n, for 3.le.n.le.7, then unaffected.
+The exchange code (RMATRX1) used a later version of TENSOR which has this
+problem fixed but NX used the original TENSOR as published. 
+(Thanks to PJS for highlighting the discrepancy between NX and X results
+and to VMB for tracking it to TENSOR.)
+
+29/04/05 stg3nx 1.11
+********************
+Stop any NBUG from dstg3 from overwriting NBUG set (or not set) in dstgnx;
+i.e. exchange NBUG settings in dstg3 are ignored. NX NBUG must be set in
+dstgnx.
+
+28/04/05 stg2nx 1.11
+********************
+Add NBUG varaibles to dstgnx NAMELIST.
+
+20/04/05 stgicf (4.3), stgicfdamp (4.3)
+***************************************
+STOP if zeroed-out TCC too large.
+
+15/03/05 stgjk (2.24)
+*********************
+If levels tagged for skipping lie above ESKPH but there are no higher
+levels (below ECORR) of the same symmetry then the wrong levels are
+included in the CC expansion (because there is no subsequent higher
+CC level to tag with skip info). Note, mdstjk flags this as a
+checksum error, but the dstgjk input file looks "o.k.".
+stgjk can now handle this and mdstgjk does not flag a checksum error.
+
+04/11/04 stg1r (2.36)
+*********************
+Tests for use of target box functions.
+
+02/11/04 stg1r (2.36)
+*********************
+Use R-matrix boundary defined by externally tabulated radial mesh when
+it defines a box function i.e. do not redetermine internally.
+
+02/09/04 stgf (4.5), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Speed-up perturbation integrals RZERO to RTWO (mainly non-MQDT).
+
+25/08/04 stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************
+Partitioned energy (EZERO) missing.
+
+31/07/04 stg2r (3.4), stg3r (3.1)
+*********************************
+KAB's latest approach to eliminating weakly coupled N+1 terms (which he calls
+configurations...)
+
+15/07/04 stgf (4.5), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Dipole top-up in jj-coupling (DARC and DARC interface) was not coded-for.
+
+19/06/04 stgb (2.18)
+********************
+E-files not being written - KB.
+
+25/05/04 stg3r (3.1)
+********************
+Corrections to below.
+
+22/05/04 stg3r (3.1)
+********************
+Added alternative input of energy corrections - see STG3RD for details.
+
+13/05/04 stgf (4.5), stgfdamp (4.5), stgbf0damp (4.5)
+*****************************************************
+Read partitioned R-matrix H.DAT produced by stg3r v3.1 or later.
+
+13/05/04 stg3r (3.1)
+********************
+Uses a partitioned R-matrix when IPRCENT.lt.100 (.gt. 50 recommended) is
+specified in NAMELIST STG3A. Requires use of stgf v4.5 or later.
+
+27/04/04 stgb (2.18)
+********************
+Allow read and processing of DARC "H.DAT". Also, processing of
+H.DAT from DARC interface, i.e. containing K-1 (not K of jK)
+in the L2P array, as opposed to small l. Basically, READ1,2 SCALE1,2
+from stgf plus energy derivative of Buttle correction (INTBUTD) dereived
+analagously from INTBUT. IDENTFY labelling left as 
+
+27/04/04 stgf (4.4), stgfdamp (4.4), stgbf0damp (4.4)
+*****************************************************
+Code decoupling of core radiative rates in RAD for jj-coupling, case DARC
+and DARC interface. Use DARC DSTGH.DAT name for DARC "H.DAT" - temporarily
+used an alternative for testing purposes.
+
+24/04/04 stgf (4.4), stgfdamp (4.4), stgbf0damp (4.4)
+*****************************************************
+Switch to reading of K-1 in L2P array, as opposed to an additional kappa 
+array, from DARC interface. (DARC DSTGH writes kappa in "L2P" array still.)
+K=2*kappa (kappa.gt.0) and K=-2*kappa-1 (kappa.lt.0). K-1 is then the
+exact analogue of channel l used in LS/BP case to reference basis
+orbitals, e.g. surface amplitudes (ENDS), energies (EIGENS) and
+Buttle correction (COEFF). Thus no need to make any changes to their uses
+in DARC/interface case. Note, in pure DARC run L2P array is converted
+from kappa to K-1 in READ2.
+
+24/04/04 stg3r (2.23)
+*********************
+DARC interface now writes K-1 in L2P array so no need for any change to
+stg3r use of ENDS but need to flag this in H.DAT, by setting LRANG2=-LRANG2.
+This is detected in stg3r itself by use of ICODE=25 from DARC interface.
+This finally solves the differences between pure DARC run and DARC
+interface. (Small l was in L2P array and this was accessed by ENDS, should
+have switched to kappa resolution as per stgf Buttle.) Use of K-1 in L2P
+array makes this transparent now. 
+
+22/04/04 stgf (4.4), stgfdamp (4.4), stgbf0damp (4.4)
+*****************************************************
+Allow processing of H.DAT from DARC interface to use original DARC Buttle
+correction (DBUT.DAT) as opposed to Seaton fit via (BUTFIT).
+
+21/04/04 stgicf_blas (4.3)
+**************************
+Fixed bug in BLAS version only. Introduced in stgicf v4.3 affects
+parallel (2.3) as well v2.2/4.2 o.k.
+
+19/04/04 stgf (4.4), stgfdamp (4.4), stgbf0damp (4.4)
+*****************************************************
+Allow read and processing of DARC "H.DAT". Also, processing of
+H.DAT from DARC interface, i.e. containing kappa (not K of jK).
+Needed to reference Buttle correction by kappa, not small l.
+
+09/04/04 stgicf (4.3), stgicfdamp (4.3)
+***************************************
+Variable (EINCR) not defined case IMODE=0. If taken to be zero by compiler 
+then results are correct still. If not (e.g. g77 or Intel with -O3) then
+NaNs likely to arise in collision strengths. NOTE: repeat of problem of
+04/02/04 where EINCRH was not defined, but EINCRH is defined in terms of
+EINCR!
+
+26/03/04 stgf (4.3), stgfdamp (4.3), stgbf0damp (4.3)
+*****************************************************
+Re-worked COUL for open-channels when PERT='YES' to integrate inwards
+to RZERO from R2(I) and outwards from R2(I) to RTWO. Previous long
+inwards integration gave small errors to S,SP,C,CP at RZERO which
+caused large errors in weak elastic K-/S-matrices. In turn, (ICFT)
+transforming these LS matrices, gave rise to large spikes in weak
+forbidden transitions.
+
+22/03/04 stg2nx 1.11
+********************
+Reversed orbital and radial indices on orbital storage for RS (CPB).
+Large speed-up in big cases.
+
+20/03/04 stgf (4.3), stgfdamp (4.3), stgbf0damp (4.3)
+*****************************************************
+Reversed indices on WMAT (and AVECT1, DDEC, ZCOEF for damped codes).
+Large speed-up in big cases on certain architectures (e.g. Itanium 2).
+
+17/03/04 stg2r (3.4)
+********************
+STOP rather than just WARNING when LRANG2 too small.
+
+16/03/04 stg1r (2.36)
+*********************
+Ensure fine enough radial mesh for STO- when fast NX1.DAT run being
+made, i.e. with small MAXLT and MAXC.
+
+12/03/04 stgjk (2.24)
+*********************
+Write N2HDAT=1 to RECUPH for consistency with stg3r.
+
+05/03/04 stg2r (3.4)
+********************
+Added KAB's option (ICUT=-1) to drop weak N+1 configs (ICUT=0 default still).
+
+04/02/04 stgicf (4.2) stgicfdamp (4.2)
+**************************************
+Variable (EINCRH) not defined case IMODE=0. If taken to be zero by compiler 
+then results are correct still. If not (e.g. g77 or Intel with -O3) then
+NaNs likely to arise in collision strengths.
+
+04/02/04 stgicf (4.2) stgicfdamp (4.2)
+**************************************
+Restrict UNIT numbers to .LT. 100, for g77 compiler.
+
+02/02/04 stgjk (2.24)
+*********************
+Allowance for sign reversal on dipole velocity (Mar 03) introduced 
+incompatibile lengths in COMMON/LRPOT/.
+
+29/01/04 stgf (4.2), stgfdamp (4.2), stgbf0damp (4.2), stgicfdamp (4.2)
+***********************************************************************
+REAL -> DBLE
+
+07/11/03 stglib (2.13)
+**********************
+GENSUM bug-fix from KAB:
+COLD          IF (I.EQ.1) GOTO 460
+          IF (I.LT.J) GOTO 460             !KAB 5/11/03
+
+16/10/03 stg1r (2.36), stg2r (3.3), stg3r (2.23)
+************************************************
+Added the default FORM='UNFORMATTED' explicitly to 
+OPEN (STATUS='SCRATCH',ACCESS='DIRECT' etc for sloppy f77 compilers.
+
+18/08/03 stg1r (2.36)
+*********************
+Allow NPSMN(l), NPSMX(l) to independently specify MIN and MAX 
+pseudo n for given l. Extension of old NPS(l) parameter. (Don)
+
+18/08/03 stgf (4.2), stgfdamp (4.2), stgbf0damp (4.2)
+***************************************************
+Added output for BP differential code. (Don)
+
+08/08/03 stgf (4.2), stgfdamp (4.2), stgbf0damp (4.2), 
+stgicf (4.2), stgicfdamp (4.2)
+***************************************************
+Catch overflow for graceful failure in FDIP. Failure expected and
+coded for, but ungraceful hardware failure to be avoided.
+
+08/08/03 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+ITOP not being (re-)set (because not being passed-on from  MAIN).
+Thus, near-degenerate non-dipole top-up not using our preferred
+methodology, but probably o.k. all the same.
+
+05/08/03 stgf (4.2)
+****************
+Inaccessible statement moved - case neutral MQDT, which stops anyway
+if there are any closed channels!
+
+04/08/03 stgb (2.17)
+********************
+Fix array out of bounds (MZEST).
+
+23/05/03 stg2r (3.3)
+********************
+KAB's writing of target LS polarizabilities.
+
+13/03/03 stgbf (2.8)
+********************
+Updated for BP velocity as per stgbb (below). 
+Must use updated prebf. (Attempt is made to see if vel. array
+present and BACKSPACE if apparently not, not guaranteed failsafe.)
+LS unaffected.
+
+13/03/03 prebf (2.8)
+********************
+Pass thru BP velocity array. BP MUST use updated stgbf as the new
+DVEC file will be mis-read by old stgbf. DNM o.k. because new
+info at end of each file. But single DVEC has new info distrib.
+thru out.
+
+13/03/03 stgbb (2.6)
+********************
+Initial BP velocity to zero for LS case.
+
+11/03/03 stgjk (2.24), stg3r (2.23), stgbb (2.6)
+************************************************
+Allow for LS reversal in stgjk on velocity.
+Hence reversed BP velocity correct in stgbb.
+
+10/03/03 stgbb (2.6)
+********************
+Reverse sign on DP contribution.
+
+08/03/03 stgjk (2.24)
+*********************
+Sign reversal on velocity dipoles (relative to length) when matrix
+elements reversed.
+
+07/02/03 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+Scaling factors in ZMQDTK were hard wired, now replaced by ZFSCL and FSCL.
+
+06/02/03 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+Neutral MQDT simplified. Scaling introduced via ZFSCL and FSCL,
+complex coefficient and energy factor, on K-matrix (IQDT=2) only so far.
+Dipole matrices not yet adjusted (stgbf0damp).
+
+31/01/03 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+PERT now added for neutral MQDT. 
+Corrected MQDTS routine for use on neutrals (i.e. don't!).
+Still to factor out threshold energy dependence, so do not interpolate
+(or use in stgicfdamp) yet.
+
+25/01/03 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+MQDT extended to neutrals (no PERT yet).
+
+25/01/03 stgf (4.2)
+*******************
+Minor
+
+21/01/03 stgbf (2.15)
+*********************
+Inserted PARAMETER (MZMSH0=MZMSH). Delete and add specific value for
+MZMSH0 (.lt. MZMSH) to PARAM file if this proves too large (only used
+by stgbf).
+
+15/01/03 stg3r (2.23)
+*********************
+Write headers to H.DAT when IPWINIT.GT.1 if no prior H.DAT exists,
+i.e. H.DAT not being appended.
+
+13/01/03 stg2r (3.3)
+********************
+Fix for LNOEX.
+Write sizeH.dat for pstg3r. Previously, info was read from rout2r.
+When this was changed to sizeH.dat in pstg2r/pstg3r it got left out of
+stg2r.
+
+07/01/03 stgb (2.17), stgf (4.2), stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************************************
+Fixed bug in evaluation of function derivative following Numerov
+integration - neutral atom only.
+
+20/12/02 stgjk (2.24)
+*********************
+First attempt to fix bug in RECUD phase factor.
+
+20/12/02 stgb (2.17)
+********************
+Fixed case where symmetry in H.DAT not found by stgb.
+(This was because default stgb operation uses symmetry order
+in dstgb, not H.DAT as before, for damping codes.)
+
+19/12/02 stg1r (2.36), stg2r(3.3), stgjk (2.24), stg3r (2.23)
+*************************************************************
+Transparent mods to allow reading of passing files from Werner's codes.
+
+17/12/02 stgbb (2.6)
+********************
+Fix from KB to allow odd-even parity ordering. Also, added missing
+AC from THETBB.
+
+12/12/02 stgicf (4.2) stgicfdamp (4.2)
+**************************************
+Dimension exceeded can cause crash before reaching STOP test.
+
+01/11/02 stgfdamp (4.2), stgbf0damp (4.2)
+*****************************************
+Neutral case added. 
+
+01/11/02 stgf (4.2)
+*******************
+Archived 4.1.
+
+17/10/02 stgbb (2.6)
+********************
+Read of B00 not terminating correctly when -1 -1 -1 used to terminate,
+as opposed to EOF.
+
+22/07/02 stg1r (2.36)
+*********************
+Minor fix for gf77.
+
+06/07/02 stg2r (2.43)
+*********************
+Minor formatting.
+
+04/07/02 stg2r (2.43) stg3r (2.23)
+**********************************
+Minor re-organization of some dimensioning.
+
+03/07/02 stg2r (2.43) stg3r (2.23)
+**********************************
+Adjust for consistency with parallel codes viz STG2HX.DAT -> STG2HXXX.DAT,
+split AMAT.DAT to AMATUXXX.DAT (and unformatted).
+
+28/06/02 stg1r (2.36)
+*********************
+Minor.
+
+31/05/02 stg2r (2.43)
+*********************
+Improved some checks.
+
+02/05/02 stg3r (2.22), stg3nx (1.11)
+************************************
+Modify EPSI for DSYEVR.
+
+01/05/02 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Supress over cautious warning messages.
+
+29/04/02 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Continuing high-L RMPS (esp neutrals) problem, this new coding occasionally
+causes the outer region mesh to be incorrectly defined for certain channels
+at certain enregies and ang. mom. (specifically, if the redefined mesh
+still cannot fit on the grid allowed by the dimensions). This has been
+corrected.
+
+07/02/02 stgfdamp (4.1), stgbf0damp (4.1)  and stgicfdamp (4.2)
+***************************************************************
+Approx tan(pi*znu) by i when imaginary part of effective quantum number gets
+large (Allan Whiteford).
+
+07/01/02 stg1r (2.36)
+*********************
+Made SR.TABORB radial tabulation to file 'radout' consistent with input for
+AUTOSTRUCTURE. Access via NBUG5=2 or RADOUT='YES' (in NAMELIST/STG1A/).
+STO output does not have number of orbitals, needs to be added manually
+on line 1 of 'radout' file.
+
+06/12/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Continuing high-L RMPS (esp neutrals) problem, cannot allow non-oscillatory
+(negative energy) solutions to use excessively large step otherwise Numerov
+can overflow. Re-instated testing of these channels, but using a weaker condition 
+than for oscillatory solutions. Furthermore, drop these deeply-closed channels
+if their presence means that outside the box contribution from open-channels
+cannot be determined. At high-L, virtually all of the open-channel interaction
+is from outside of the box so it is crucial to retain it.
+
+27/11/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Fix for high-L, RMPS in neutrals. Outer-region step should not be
+determined by negative energy solutions (since non-oscillatory).
+Otherwise, get H excessively small and outer region tabulation is
+severely restricted. These deeply-closed channels have negligible
+effect on open-channels, as we have seen previously in MQDT.
+
+27/10/01 stg3nx (1.11)
+**********************
+Minor.
+
+20/10/01 stg1r (2.36), stg2r(2.43), stgjk (2.24)
+************************************************
+Tidy-up precision etc.
+
+19/10/01 stglib.f (2.13)
+************************
+Tidy-up precision etc.
+
+18/10/01 stg3r (2.22), stg3nx (1.11)
+************************************
+Added optional (i.e. commented-out) code for using LAPACK/BLAS library
+to carry-out diagonalization of H(N+1). DSYEVR uses 4x memory, but is not
+suitable for all architectures, while DSYEVD uses 6x memory and should
+work on all systems. A factor 5 speed-up can be obtained with highly
+optimized LAPACK/BLAS libraries, e.g. SUN Performance library or ATLAS BLAS.
+
+Tidy-up precision etc.
+
+17/10/01 stg1nx.f (1.10), stg2nx.f (1.10) 
+*****************************************
+Tidy-up precision etc.
+
+23/07/01 stgicf (4.2), stgicfdamp (4.2)
+***************************************
+In optional read of NTLSRD from TCCDW.DAT, test and reset if NTLSRD.LE.NTLS.
+
+29/06/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)  and
+*****************************************************
+29/06/01 stgicf (4.2), stgicfdamp (4.2)
+***************************************
+Modification to OMEGA scratch file operation (Circa March 2001) for parallel
+code was incorrect, crashed serial code as well.
+
+09/06/01 stglib (2.12)
+**********************
+Minor - avoid floating point exception on T3E/IBM-SP.
+
+07/06/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Variable not being initialized in Numerov routines, case of
+a single step only (Dario).
+
+30/05/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)  and
+*****************************************************
+30/05/01 stgicf (4.2), stgicfdamp (4.2)
+***************************************
+Re-instated option of LS K-/S-matrix files *not* split apart by symmetry.
+Of no interest to serial code, but useful for parallel code when using
+a large number of processors and a small limit on the global number of
+open files. Default is to split by symmetry. These stgicf/damp (4.2) are
+thus back compatible with stgf suite 3.x, provided the default is overriden.
+
+29/05/01 stgicfdamp (4.1)
+*************************
+Fixed Gailitis average & DR - last working version was v3.7 of 09/03/01.
+
+25/05/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)
+*****************************************************
+Radiative width was not always being re-calculated when a DR final state
+moved from bound to autoionizing as ETOT increased, hence overestimating
+DR because autoionizing states were sometimes treated as recombined (stable).
+
+24/05/01 stgf (4.1), stgfdamp (4.1), stgbf0damp (4.1)  and
+*****************************************************
+24/05/01 stgicf (4.1), stgicfdamp (4.1)
+***************************************
+stgf/damp/bf0damp LS K-/S-matrices for stgicf/damp are split apart by symmetry.
+(So, 3.x stgf suite is compatible with 3.x stgicf suite, and 4.x with 4.x.)
+
+21/05/01 stgicf (3.7), stgicfdamp (3.9)
+***************************************
+Speeded-up the jk->IC recoupling again.
+
+19/05/01 stgicf (3.7), stgicfdamp (3.9)
+***************************************
+Further reduced memory requirement by moving fully to packed vector
+storage. stgicf k(phys)->T substantially faster for large NCHOP.
+Re-coupling (jK->IC) a little slower. 
+
+12/05/01 stgicf (3.6), stgicfdamp (3.8)
+***************************************
+Substantially reduced memory requirement for large channel (>1000)
+cases.
+
+11/04/01 stgf (3.5), stgfdamp (3.5), stgbf0damp (3.5)
+*****************************************************
+Minor.
+
+31/03/01 stg3r (2.21)
+*********************
+Minor mod for parallel code.
+
+09/03/01 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+By default, the (dipole) infinite energy info is now only written to the
+end of OMEGANOTOP. The program omadd (V1.10) uses this to differentiate 
+between dipole and non-dipole transitions when looking at top-up factors. 
+See the stgicfadas.txt notes, which have also been updated to take account 
+of the infinite energy limits coming from AUTOSTRUCTURE (including Born
+limits for the non-dipole transitions). This is why the OMEGA produced by
+stgicf/damp does not contain infinite energy info now, since it is dipole
+only.
+
+08/03/01 ***IMPORTANT*** stgicf (3.5), stgicfdamp (3.7)
+*******************************************************
+The fix for (near) degenerate dipole top-up introduced on 26/11/00 
+introduced an error which effectively switched-off the dipole top-up.
+Versions between 26 NOV 00 and 21 FEB 01 inclusive should not be used.
+A reduced energy plot of any dipole transition should clearly be
+inconsistent with the limit point, and we all check this don't we.
+On a related issue, it turns out that the OMEGANOTOP file infact has
+contained top-up for the dipole transitions since v2.6, introduced 
+in Feb 2000. Comparisons for non-dipole transitions were unaffected.
+
+02/03/01 stgf (3.5), stgfdamp (3.5), stgbf0damp (3.5)
+*****************************************************
+Incorporated Seaton's changes to the specification of constants in the Numerov
+routines etc. (Implemented slightly differently to ensure correct precision
+obtained when using IMPLICIT REAL*8 etc. rather than setting it via the
+compiler.) The original constants were given to 8 s.f, consequently some,
+hopefully, small differences may arise compared to results from v3.4.
+
+28/02/01 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Fix for COULS at high-L (>60).
+
+21/02/01 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Added parity label to 2J+1 target symmetries to enable infinite energy
+Born to be distinguished from dipole. (stgf suite already did so.)
+
+21/02/01 stg3nx (1.10)
+**********************
+Minor.
+
+17/02/01 stg2r (2.42)
+*********************
+Revised dimension check (Don).
+
+04/01/00 stg1r (2.35), stg2r (2.42), stgjk (2.23), stg3r (2.21)
+***************************************************************
+Added MAXLD/J2MAXD to limit max L/2J for which dipole data is calculated.
+This is independent of MAXLT/J2MAX which limits the scattering symmetries.
+Useful for damped excitation/recombination where NTYP2I damping only
+occurs for low-L/J but we require scattering to much higher-L/J. Especially
+useful in ICFT runs where it is tedious to split dipole and non-dipole
+inner region runs. The DNM files obtained are identical to those obtained
+from a full run except for: (i) in LS coupling the last few will be ordered
+slightly differently due to the omission of a DNM with L>MAXLD which occurs
+before a DNM with both L<=MAXLD. (ii) in BP mode the last few DNM files are
+apparently different. Infact this is due to some fossil LS-coupling data
+that is passed-on by stgjk without re-coupling, and to point (i), and so could 
+never be used in BP mode. Infact we don't use it in LS-coupling either.
+It was used by STG4 to generate (LS) dipole polarizabilities.
+
+01/12/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Speed-up recoupling in KMTRIC by loop interchange (Keith Butler).
+
+14/12/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Added code for use by parallel version only, commented-out in serial code.
+
+26/11/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Fix to dipole top-up for exact degenerate levels.
+
+25/11/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Minor mods for g77.
+
+24/10/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Important mods for MQDT operation on Crays.
+
+12/10/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Use explicit REAL*16 in coulfg for large cases, especially on a Cray.
+
+26/09/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Minor.
+
+26/09/00 stg2r (2.41), stg3r (2.20)
+***********************************
+Don & Dario's coding of the splitting of STG2H.DAT into multiple files
+for running in limited operating systems. Set N2HDAT.gt.1 (.le.10) to
+break-up in to N2HDAT files.
+
+16/09/00 stg1r (2.34)
+*********************
+Switch-off diagonal one-body relativistic corrections except when the
+new (ISMIT.NE.0) Schmidt orthogonalization is being used for that L.
+
+13/09/00 stg2nx (1.9)
+*********************
+Switch-off diagonal mass-velocity terms - gives errors on inelastic BP
+cross sections. See also 26/05/00. Default is all off (RELOP='NO').
+
+11/09/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Tweaked near-degenerate non-dipole top-up.
+
+11/09/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Tweaked near-degenerate non-dipole top-up.
+
+07/09/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Case of writing formatted (non-zero) omegas columnwise:
+modified number of omegas written to be consistent with rounded energies.
+
+07/09/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Case of writing formatted (non-zero) omegas columnwise:
+modified number of omegas written to be consistent with rounded energies.
+
+19/08/00 stgicf (3.5), stgicfdamp (3.7)
+***************************************
+Replaced matrix inversions by AX=B solution in MQDT routines.
+
+19/08/00 stgf (3.4), stgfdamp (3.4), stgbf0damp (3.4)
+*****************************************************
+Replaced matrix inversions by AX=B solution in MQDT routines and in
+ABINV, which also incorporates KAB's partitioning of the non-MQDT problem.
+
+12/08/00 stgicf (3.4), stgicfdamp (3.6)
+***************************************
+Added facility to read-in LS K-matrices for batches of energies so as
+to reduce I/O. The number read is NMLSE+1 and the additional memory used is
+NOMCL*NMLS*NMLSE words. (Use is made of the original memory to store the
+first energy read, NMLSE are then held.)
+
+02/08/00 stgf (3.3), stgfdamp (3.3), stgbf0damp (3.3)
+*****************************************************
+Added explicit symmetric coding for K->S, includng matrix inversions.
+
+31/07/00 stg2r (2.40), stgjk (2.22)
+***********************************
+Modified ESKPL test to handle certain cases.
+
+27/07/00 stg3r (2.19)
+*********************
+Further reduced memory requirement of HAMNEW. 
+No longer need to worry about NSIZEH.
+
+26/07/00 stg1r (2.34)
+*********************
+Put in warning if all B&W occuppation numbers are zero in the radial file
+as code reverts back to using defaults. Set IMAXN=-1 to force them all to
+be zero.
+
+25/07/00 stg2r (2.40), stg3r (2.19)
+***********************************
+Format of AMAT.DAT file written by stg2r needed changing for large N+1 cases 
+as stg3r failed to read it correctly (but stopped safely). Re-wrote HAMNEW
+to use less memory. However, if NSIZEH was previously set much smaller than
+MXMAT then memory will increase. If not using HAMNEW then set NSIZEH=1.
+
+22/07/00 stgicf (3.4), stgicfdamp (3.6)
+***************************************
+Re-orthonormalize (as opposed to re-normalize) TCCs.
+Allow number of IC target levels to be less than number of jk levels.
+Replaced both BLAS and non-BLAS matrix inversion routines with those
+for a symmetric matrix as opposed to a general matrix.
+
+19/07/00 stgbf (2.15)
+*********************
+M11 added to SAVE in READXY (PJS).
+
+18/07/00 stgicf (3.3), stgicfdamp (3.5)
+***************************************
+Use of observed term energies failed for default NTLSRD=0 in TCCDW.DAT.
+stgicf (3.2), stgicfdamp (3.4) unaffected.
+
+18/07/00 prebf (2.8), stgbf (2.15)
+**********************************
+ABORT to ABORTT for gnu f77 compiler (PJS).
+Fixed bug in stgbf, FLAFGL in CALL READXY (PJS).
+
+15/07/00 stgicf (3.3), stgicfdamp (3.5)
+***************************************
+Reading of NX K-/S-matrix data could halt because of apparent inconsistancy
+of input data with what was expected. Only occurred for certain systems.
+Now fixed.
+
+15/07/00 stg2r (2.42)
+*********************
+Added TITLE to SAVE in SR.STG2RD (PJS).
+
+10/07/00 stgicf (3.3)
+*********************
+In the commented-out BLAS routines, IPIV should be IPIVOT.
+
+07/07/00 stgfdamp (3.2), stgbf0damp (3.2)
+*****************************************
+Minor mod to the evaluation of NTYP2OR radiation.
+
+27/06/00 stgbf (2.15), prebf (2.8)
+**********************************
+Updated for consistancy with 08/04/00 stgb (2.17) writing extra info to B00.
+
+27/06/00 stgf (3.2), stgfdamp (3.2), stgbf0damp (3.2)
+*****************************************************
+Bug-fix for IMODE=-1 PERT='YES' operation.
+
+24/06/00 stgf (3.2), stgfdamp (3.2), stgbf0damp (3.2)
+*****************************************************
+Control READ/WRITE of unphysical K/S-matrix via IMODE (as per stgicf) rather
+than IQDT viz. IMODE=0 WRITE, IMODE=1 READ, IMODE=-1 no WRITE/READ (single 
+pass). Use IQDT only to specify the type of MQDT operation (K-, S- etc.)
+Default, IMODE=0.
+
+15/06/00 stgf (3.2), stgfdamp (3.2), stgbf0damp (3.2), stgicf (3.3), stgicfdamp (3.5)
+*************************************************************************************
+Optionally write unformatted collision strength file OMEGAU, if PRINT='UNFORM'.
+Added utility routines om2omu.f and omu2om.f to convert. Other utilities, viz.
+omadd.f, omgmrg.f, xtrct.f, adasex.f adasexj.f can all handle unformatted files.
+
+12/06/00 stgf (3.2), stgfdamp (3.2), stgbf0damp (3.2) 
+*****************************************************
+Could fail to determine all radiative rates in LS coupling if two
+terms never appear in the same N+1 symmetry. 
+
+08/06/00 stgicf (3.3), stgicfdamp (3.5)
+***************************************
+Given the generalization of the use of CI terms interspersed with CC terms, 
+elimination of CI components from the TCCs has been made more automatic by 
+comparing the the first NTLSRD term energies in TCCDW.DAT (after energy
+ordering) with the NTLS in term.dat. Those terms in TCCDW.DAT that find a
+match in term.dat are taken to be CC and those that don't find a match
+are taken to be CI. The default is unchanged, i.e., the first NTLS are
+taken to be CC. The new option is accessed via the NTLSRD being set non-zero
+on line 1 of the TCCDW.DAT file after "LS TERMS". The default is blank/zero.
+If this automatic matching is a problem then it can still be done manually
+by setting NTLSRD= -|NTLSRD| and tagging the term numbers (in TCCDW.DAT)
+negative for the CI. Anything above |NTLSRD| is still taken to be CI.
+
+07/06/00 stg2r (2.40), stgjk (2.22)
+***********************************
+Added ESKPL, ESKPH, ECORR to specify energy range of terms/levels to be omitted 
+from the CC expansion. Those that lie between ESKPL and ESKPH Ryd relative
+to the ground are omitted. In this case, one may need to specify ECORR, the
+energy above which ALL terms/levels are treated as CI since it cannot now be
+determined internally. These options are consistent with the ISKIP option 
+which can be used in conjunction with them. The defaults remain unchanged.
+
+07/06/00 stg3r (2.19)
+*********************
+Added early dimension check on MXDM so as not to bomb-out in DMAT1
+after many hours of CPU.
+
+26/05/00 stg1r (2.34)
+*********************
+Reversed change 1/ of 29/01/00 i.e. switch-off of diagonal BP integrals
+which gave rise to errors in elastic channels only because this is
+inconsistent with new Schmidt orthohgonalization (ISMITN=1) and affects
+INELASTIC transitions. Ditto stg2nx (1.9).
+
+23/05/00 stg3r (2.19), stg3nx (1.10)
+************************************
+In solving the obscure bug of 12/04/00 I inadvertently created one:
+the channels for a fixed term were ordered by descending l instead
+of ascending, the latter is required by the LS top-up in stgf.
+
+22/05/00 stgf (3.2), stgfdamp (3.2), stgbf0damp (3.2) Minor
+*****************************************************
+Additional tests.
+
+18/05/00 stg2r (2.40) Minor
+*********************
+Added KAB's code to printout gf-values (IBUG5=-1), minus the test
+IF(CFADD.EQ.ZERO) GO TO 180 for safety.
+
+13/04/00 stgg (1.20)
+********************
+Update projection subroutine to handle case of pseudo and physical
+orbitals of same n but different l. Prior to this it was assumed 
+that all l of a given n were either physical or pseudo. Note,
+AUTOSTRUCTURE has also been updated to provide the overlaps for
+such a scenario.
+
+12/04/00 stg3r (2.19), stg3nx (1.10)
+************************************
+Use of a 1.e-7 tolerance in SR.ORDER gives rise to non-energy ordered
+states in hydrogenic systems which can cause subsequent problems esp. in
+stg3r as ORDER in TAPERD uses a.u. while WRITOP uses Ryd. This causes an
+inconsistency between term and channel indexing if the separation is
+between 5.e-8 and 1e-7 a.u. Use NAST to read in slightly separated 
+term energies to ensure the order that you want. There is no problem
+with stg3nx but it needs to order target terms consistently with stg3r.
+
+08/04/00 stgfdamp (3.1), stgbf0damp (3.1)
+*****************************************
+Changed damping defaults and added more checking of user input for damping.
+Previously, all damping was OFF by default (but DR was ON, which meant that
+elastic transitions were present in the OMEGA file). Now all damping for
+excitation is ON (NTYP1=1, NTYP2I=1, NTYP2OR=1) but DR is OFF (NDRMET=0
+NTYP2OF=0). The code looks for appropriate B and D files and checks user
+input. The user is then instructed to switch off damping if required files
+are missing or to generate them if damping is required. Hopefully, this
+will mean that damping is not "missed" by inexperienced users. Code also
+attempts to determine NMIN, as required by NTYP2OR/F, from a modified B00
+file produced by stgb 2.17 or later. Obviously, if NTYP2I=0 this is not
+possible but the user is asked for a valid NMIN or told switch off the
+NTYP2O damping - again, their choice.
+
+08/04/00 stgf (3.1) Minor
+*******************
+Minor
+
+08/04/00 stgb (2.17)
+********************
+Write extra info to end of B00 for stgfdamp.
+
+07/04/00 stgicfdamp (3.4)
+*************************
+Corrected bug in NTYP1 rad. Added Gailitis average (via QNMAX of MESH1 as
+per stgf/damp). Allow re-coupling of unphysical S-matrix produced by
+stgf/damp. Gives good agreement with BP for dn=0 DR.
+
+07/04/00 stgf (3.1), stgfdamp (3.1), stgbf0damp (3.1)
+*****************************************************
+Write complex K- and or S- matrix for stgicfdamp.
+
+07/04/00 stgicf (3.2)
+*********************
+Minor, for consistancy with stgicfdamp.
+
+07/04/00 stgjk (2.22) minor
+***************************
+Output TCCDW.DAT TCCs with more d.ps for closer unitarity test in stgicfdamp.
+
+04/04/00 stgicf (3.2), stgicfdamp (3.4)
+***************************************
+Allow IMODE=1 to use a subset of the coarse enegry mesh.
+
+01/04/00 stgicfdamp (3.4)
+*************************
+Added determination of DR collision strengths.
+
+01/04/00 stgicf (3.2), stgicfdamp (3.3)
+***************************************
+Bug-fixes for ITCC=0 operation and for IMODE=1 operation.
+Note, ITCC=1 and IMODE=0,-1 unaffected - these denote our main operation.
+
+31/03/00 stgicf (3.2), stgicfdamp (3.3)
+***************************************
+Added elastic transitions - required for DR via unitarity.
+
+29/03/00 stgicfdamp (3.2)
+*************************
+Added inner electron (NTYP1) damping.
+
+29/03/00 stgf (3.1), stgfdamp (3.1), stgbf0damp (3.1) Minor
+***********************************************************
+Tweak evaluation of radiative widths.
+
+24/03/00 stg2r (2.40)
+*********************
+Switch dimension in /CUPPLE/ MZNC1 to MZNC2.
+17/03/00
+Wrote JRELOP(1) to NX2.DAT for NX code to flag use of mass-velocity term.
+
+18/03/00 stg2nx (1.9)
+*********************
+Added mass-velocity term, for "high-l" continuation run only viz. only
+continuum-continuum contribution (and no bound contribution to it).
+
+13/03/00 stgicf (3.1), stgicfdamp (3.1)
+***************************************
+Minor re-ordering (both). File name mods to stgicfdamp.
+
+11/03/00 stgicfdamp (3.1)
+*************************
+First release of damped version of stgicf (based on 3.1). Reads and
+transforms damped (i.e. complex) unphysical K-matrix produced by
+stgfdamp, found on zkmtls.dat. The damped K-matrix includes all NTYP2 
+damping, but not NTYP1. NTYP1 damping will be via a complex effective
+quantum number in stgicfdamp - NOT YET CODED.
+In general, the non-exchange K-matrices will be real still and could
+be produced by stgf on kmtls.dat. To allow for this, INOEXCH.GT.0
+looks on zkmtls.dat while INOEXCH.LT.0 looks on kmtls.dat.
+
+11/03/00 stgicf (3.1)
+*********************
+Synchronization with stgicfdamp.
+
+11/03/00 stgfdamp (3.1), stgbf0damp (3.1)
+*****************************************
+Write complex K-matrix to zkmtls.dat (when IPRKM.EQ.4) for stgicfdamp.
+
+****************************************************************************
+CODE RENAMING: stgic (2.7) becomes stgicf (3.1)
+****************************************************************************
+
+11/03/00 stgic (2.7)
+********************
+Re-organization and tidy-up ready for initial development of damped version.
+
+08/03/00 stgf (3.1), stgfdamp (3.1), stgbf0damp (3.1) Minor
+***********************************************************
+Made the use of Coulomb-Bethe omegas the default for dipole top-up.
+Added alternative (smooth) switching from non-degenerate to degenerate
+case in non-dipole top-up, as per stgic.
+
+04/03/00 stgbf0damp (3.1) Minor
+*******************************
+Changed total photoabsorption file name to XPATOT to emphasise that it is
+not the same as the total photoionization when damping is present.
+XPIPAR contains partial photoionization to each electron target continuum
+still and XPISUM still contains the sum over the partials which may, or
+may not, be equal to the total photoionization. XPISUM can contain more
+partials than are in XPIPAR.
+
+02/03/00 stgic (2.6)
+********************
+Additional test for determination of allowed multipoles for non-dipole top-up.
+Fixed TOP3 not being initialized if no inelastic open channels present at the 
+first energy.
+26/02/00
+Alternative switch to (non-dipole) degenerate limit - when energy ratio
+equals [Jmax/(Jmax+1)]**(2*lambda-1). Detailed logging of top-up fractions.
+
+22/02/00 stgbf0damp (3.1)
+*************************
+Allow NTYP2I=0 when IPHOTO.NE.0, i.e.  case of photoionization/recombination 
+with NTYP1 damping switched-on (NODAMP=1 switches it all off).
+
+22/02/00 stg2r (2.39)
+*********************
+Mods to NOICC operation.
+19/02/00
+KAB's elimination of weakly mixing CI terms.
+
+18/02/00 stg2r (2.38)
+*********************
+Connor's NOICC.GT.0 option to calculate the no. of IC channels from an LS run.
+
+17/02/00 stgbf (2.15)
+*********************
+Initialize some switches for IQDT.GT.0 and IPRINT.GE.0 combination.
+
+15/02/00 stg1r (2.34), stg2r(2.37)
+**********************************
+Do no write or overwrite NX*.DAT files when spin-orbit operator is on viz.
+RELOP='YES', 'TCC' or IRELOP(3)=1.
+
+15/02/00 stgbf (2.15) minor
+*********************************
+Minor mods for Cray.
+
+15/02/00 stgf (3.1), stgfdamp (3.1), stgbf0damp (3.1)
+*****************************************************
+Minor mods for Cray.
+12/02/00
+Tweak CORINT for efficiency at high-L (MQDT perturbations).
+
+14/02/00 stgb (2.16), stgbf (2.15) minor
+**********************************
+Initialize a couple of variables that were not being initialized.
+
+12/02/00 stg3nx (1.10)
+**********************
+BUFFER 1 in RDRINT needed a test re-instated (no error would have resulted
+because the code would have halted execution because of it).
+
+11/02/00 stgic (2.6)
+********************
+Determine multipole of transition. Then use this to enable non-dipole
+top-up to switch over to the denerate energy case.
+
+09/02/00 stgic (2.5)
+********************
+Added improved CBe routines. Also, Don's JMNTWO specification for an 
+exchange (R-matrix) run.
+
+****************************************************************************
+CODE RENAMING: stgfdamp (2.14) becomes stgbf0damp (3.1)
+CODE RENAMING: stgfrad (2.19) becomes stgfdamp (3.1)
+               (stgf (2.33) just becomes (3.1))
+****************************************************************************
+
+05/02/00 stgf (2.33), stgfrad (2.19), stgfdamp (2.14)
+*****************************************************
+Improved testing for breadown of dipole Coulomb integrals used by CBe
+top-up. In addition, the values of all failures should infact be 
+vanishingly small and so they are now set to zero rather than switching
+back to using CC partial omegas.
+
+01/02/00 stgfrad (2.19), stgfdamp (2.14) Minor
+****************************************
+Allow execution to continue with warning if D file(s) missing. 
+
+29/01/00 stg1r (2.34)
+*********************
+1/Switch-off diagonal continuum-continuum 1-body relativistic corrections as
+they have an unphysically large effect on the elastic K-matrix elements
+(possibly because a non-relativistic Buttle correction is still being used).
+2/Check for breakdown of exchange integrals earlier.
+3/Stop if code tries to switch Buttle correction method between l's (stgf
+can't handle this). Added MJS variable (=0) to force quadratic if required 
+(e.g. when BSTO.eq.ZERO).
+
+25/01/00 stg2nx (1.8), stg3nx (1.10)
+************************************
+Fixed bugs to BUFFER 1 in GENINT (stg2nx) and LOC1CC, RDRINT (stg3nx).
+
+21/12/99 stgf (2.33), stgfrad (2.19), stgfdamp (2.14)
+*****************************************************
+NOMWRT .LT. 0 writes -NOMWRT collision strengths to OMEGA columnwise
+(upper half matrix) excluding zeroes. NOMWRT .GT. 0 (default) remains
+unchanged: NOMWRT collision strengths row-wise, including zeroes.
+The latter is for consistancy with our current post-processing programs
+while the former is IP "standard".
+
+20/12/99 stgjk (2.22)
+*********************
+Dimension of DUMMY in COMMON/SCRACH/ increased to 3*MXJC.
+
+20/12/99 stgfdamp (2.13)
+************************
+Total photoabsorption now switched-on by IPHOTO.GE.1000 and the cross section
+output to XPITOT. Number of electron continua is now IPHOTO modulo 1000.
+The partials are in XPIPAR still but the sum of the partials to IPHOTO (modulo
+1000) is now in XPISUM. If IPHOTO (modulo 1000) .GT. MZPHT then MZPHT partials
+are resolved but the sum is over IPHOTO (modulo 1000) still. Before, the
+sum was obtained by summing over the resolved partials at the end of the run.
+Now it is incremented as each partial is obtained and is not limited by MZPHT.
+18/12/99
+MQDT treatment of damped photoionization now on same general footing as
+damped excitation viz .the unphysical dipole matrices can use K- or S-mx
+normalization before being closed-off (in the former case the change to
+S-mx normalization is then via the physical S-mx) and can be interpolated
+in a single or double pass.
+
+18/12/99 stgfrad (2.18)
+***********************
+Auger damping added as in stgfdamp.
+
+16/12/99 stgfdamp (2.12)
+************************
+Photoabsorption generalized as below. crosspi3 now XPIABS. Still switched-on
+by IAUGER.NE>0 for now. This may change.
+14/12/99 
+Damped photoionization from first NPISYM  (STGB) symmetries (see below) and
+first NPIEB (STGB) energies of said symmetries. Output is now to XPITOT (was
+crosspi) for photoionization resolved by initial state but summed over all
+final (electron continuum) states and XPIPAR (was crosspi2) for the
+partial final state resolved. Note, IPHOTO.LT.0 now switches on partial
+recombination and IPHOTO.GT.0 partial photoionization to at most IPHOTO
+electron cintinua. IPHOTO=0 still switches off access to SR.PHOTO.
+
+14/12/99 stgb (2.16)
+********************
+Case IORDER=1 (default) process symmetries according to order listed by IOPT2 
+rather than order in H.DAT (IORDER=0). The latter is (slightly) faster but
+the former is more convenient for the damped codes, especially photoionization.
+
+11/12/99 stgic (2.4)
+********************
+Write an OMEGANOTOP file (approx OMEGA without top-up) when top-up is on,
+so as to assist assessment of accuracy of effective collision strengths.
+06/12/99
+Re-organized non-dipole top-up - use either energy or omega ratio (default).
+Tag omegas negative if top-up exceeds TOPR factor (1.3 = 30% etc), default
+is large i.e. off. Note, if top-up is applied to a NX run then this test 
+of the top-up contribution is relative to the NX sum only. If a substantial
+contribution comes from lower J of the exchange run then this warning is
+unnnecessarily cautious.
+
+10/12/99 stgbf (2.15)
+*********************
+Allow user to over-ride DELTA, point at which velocity dropped and length-to-
+acceleration conversion no longer carried-out due to possible cancellation errors.
+08/12/99
+Evaluation of beta failed in DSTOR if there was more than one final symmtery. 
+This bug was introduced when it was extended to handle BP betas.
+
+03/12/99 stgic (2.3)
+********************
+Remove all but trivial memory dependence on the number of Jp symmetries.
+
+01/12/99 stgic (2.2)
+********************
+Only read LS K-matrices (per energy) for those LSp required by the current
+Jp symmetry.
+
+29/11/99 stgic (2.1)
+********************
+Inter-changed energy and Jp symmetry loop. Identical results to V1.10
+except that non-dipole top-up uses the ratio of final to incident
+energy rather than successive partial omegas in the geometric sum.
+
+30/11/99 stgic (1.10)
+********************
+Minor.
+
+27/11/99 stgfdamp (2.11)
+************************
+Partial photorecombination from NDRMET metastables.
+
+27/11/99 stgf (2.32), stgfrad (2.18), stgfdamp (2.11) 
+*****************************************************
+Bug in SR.OMEG - overflow to disk - fixed. (You would have got zeroes.)
+
+19/11/99 stgbb (2.6)
+********************
+Extended to handle neutral atoms (+electron).
+Also added stgb fix of 6/97 for deeply-closed channels.
+
+19/11/99 stgbf (2.15)
+*********************
+Extended to handle neutral atoms (+electron).
+
+18/11/99 stgfdamp (2.10)
+************************
+Photoionization to resolved final (target) states now being accumulated
+over multiple final symmetries.
+
+15/11/99 prebf (2.8)
+********************
+Modified to handle neutral atoms (trivial).
+
+13/11/99 stgb (2.15)
+********************
+Extended to handle neutral atoms (+electron).
+
+12/11/99 stgf (2.32), stgfrad (2.18), stgfdamp (2.10) Minor
+*****************************************************
+Re-ordered some do-loops for efficiency.
+
+11/11/99 stgf (2.31) Minor
+********************
+Made elastic output default for neutrals.
+
+25/10/99 stg1nx (1.9)
+*********************
+Fix bug in double buffering for large CI/small buffer.
+
+25/10/99 stg3r (2.19), stg3nx (1.9)
+***********************************
+Added ISORT to STG3A NAMELIST. For ISORT=1, observed energies are expected
+in calculated energy order and not the order they were stored in stg2/stgjk.
+I.e. terms/levels can be read-in in any order in stg2/stgjk or resorted in stg2.
+As always, the first term listed in stg2 should be the ground one.
+
+11/09/99 stgb (2.14), stgbf (2.14), stgbb (2.6) Minor
+***********************************************
+Minor mods to avoid compiler warnings.
+
+11/09/99 stgf (2.31), stgfrad (2.17), stgfdamp (2.9) Minor
+****************************************************
+Minor mods to avoid compiler warnings.
+
+11/09/99 stg1nx (1.9), stg2nx (1.8), stg3nx (1.9) Minor
+*************************************************
+Minor mods to avoid compiler warnings.
+
+11/09/99 stgic (1.10) Minor
+*********************
+Minor mods to avoid compiler warnings.
+13/08/99
+File name modified: adasexj.in -> adasexj.in.form to avoid overwriting.
+
+07/09/99 stgf (2.31)
+********************
+Extended to handle neutral atoms.
+
+11/08/88 stg2r (2.37)
+*********************
+stg2r failed for bound orbital angular momentum .ge. 8 (case of extreme
+pseudo-state expansion.
+
+07/08/99 stgb (2.14)
+********************
+KAB's latest mods to IDFORM/IDENTFY.
+
+30/07/99 stgf (2.30), stgfrad (2.17), stgfdamp (2.9), stgic (1.10)
+******************************************************************
+Try to catch failures in FDIP and do not replace CC partial omegas by CBe 
+in those cases.
+
+27/07/99 stgf (2.30), stgfrad (2.17), stgfdamp (2.9)
+****************************************************
+The previous change (14/07/99) to avoid overwriting the strength.dat
+file also "avoided" writing the terminator to jbinls causing the NX stgic
+run to fail - sorry.
+
+15/07/99 stgic (1.10)
+*********************
+Don's "tidied-up" version, plus a further correction.
+
+14/07/99 stgf (2.30), stgfrad (2.17), stgfdamp (2.9) Minor
+***********************************************************
+Don't overwrite strength.dat (when IPRKM.EQ.4) if no line strengths
+have been calculated (i.e. if IBIGE.NE.1).
+
+09/07/99 stgic (1.9)
+********************
+Don's correction of his first attempt at separating LRGLAM & IDIP operation.
+
+08/07/99 stg3r (2.19), stglib (2.12) Minor
+******************************************
+Mods for g77 compiler.
+
+26/06/99 stg1r (2.33)
+*********************
+Corrected spin-orbit bug affecting STO- operation only.
+Removed ISMITN from non-namelisted input since free-formatted input
+means that standard CPC files won't run. Can easily be added by user,
+or use namelisted input instead.
+
+24/06/99 stgf (2.30), stgfrad (2.17), stgfdamp (2.9)
+****************************************************
+Incorporated hybrid-MQDT approach for deeply-closed channels (nu<l) which
+is accessed via IOMSW=-1. Uses theta for channels with FKNU<FNUHYB, subject
+to FKNU<LLCH. Default is still IOMSW=1 - omit deeply closed channels.
+
+22/06/99 stg2r (2.37)
+*********************
+Use STO- instead of S.S. to read L,2S+1,PARITY, instead of 2S+1,L,PARITY,
+as per CPC version.
+
+18/06/99 stgf (2.29), stgfrad (2.16), stgfdamp (2.8)
+****************************************************
+Added Don's option out outputting partial cross sections - see ISGPT,ITRMN,ITRMX.
+
+17/06/99 stg1r (2.33)
+*********************
+Allow usual S.S. NAMELIST input along with STOs instead of AS/SS radial file.
+Use STO- instead of S.S. and add NZ/NZED,NELC,MAXORB to NAMELIST STG1B.
+If MAXORB.GT.0 then read nl pairs, order unimportant so as per STG2 easiest
+even though, of course the STO data that follows is ordered 1s,2s,3s...2p,3p..
+etc. The STO data is as per RECORD 9 of 1995 CPC write-up.
+
+09/06/99 stgic (1.9)
+********************
+Don's bug fix for systems where target levels are half-integer J. Systems with
+target levels of integer J are unaffected. Also, separated LRGLAM operation
+from that of IDIP/IBIGE.
+
+28/05/99 stgf (2.29)
+********************
+Added Tom's eigenphase sum as a subroutine, accessed when IPRINT.GT.0.
+
+28/05/99 stg1r (2.33) (Minor)
+*********************
+Add ISMITN to (non-namelist) input option list for running analytic orbitals.
+
+06/05/99 stg2r (2.37)
+*********************
+(Hopefully) solved long-standing bug for photoionization when: RK ON FILE.
+
+06/05/99 stg3r (2.18)
+*********************
+Minor.
+
+22/04/99 stgf (2.29), stgfrad (2.16), stgfdamp (2.8) (Minor)
+****************************************************
+Removed a rather unnecessary test which had the side effect of unnecessarily
+restricting the fine-energy mesh range subset of the coarse energy mesh range
+allowable. Production runs use same energy range so no effect there. Also,
+increased BP ISKP0 to J=15 (was L/2*J=15, now L/J=15). Was only a problem if
+interpolating K/S for high J, which is not normally done since no resonances
+are present there.
+
+01/04/99 stgf (2.29), stgfrad (2.16), stgfdamp (2.8)
+****************************************************
+Incorporated alternative method to evaluate non-divergent perturbation
+integrals in MQDT viz. use only non-divergent part of closed channel
+s and c functions i.e. theta. This is an alternative to CORINT (the 
+default, INTPQ=0). Set INTPQ=1 to access the new method.
+
+11/03/99 stgfrad (2.15), stgfdamp (2.7)
+***************************************
+Reduce memory requirements as in prebf.
+
+10/03/99 prebf (2.7), stgbb (2.5)
+*********************************
+Reduce memory requirements as per KB/WE but with crucial fixes to errors
+found in the original source.
+
+06/03/99 stgb (2.14)
+********************
+Minor.
+
+23/02/99 stg1r (2.33)
+*********************
+Evaluation of the Buttle correction to the orbital was incorrect for
+l-continuum .gt. l-atomic in RMPS mode (ISMITN=1). This would be of little
+consequence, since we never make use of it, except for the fact that it
+causes a crash on the T3E as it tries to read-access a non-existent storage
+location.
+
+06/02/99 stgbf (2.14)
+*********************
+Mods for f90 - may not compile else.
+
+11/12/98 stgic (1.9)
+********************
+A note on using observed energies:
+If itcc.eq.0: if observed term energies are used in stg3 then nothing further
+is needed. If not, observed term energies can replace the calculated in file 
+term.dat, but **not** if it changes the energy order of a term.
+If itcc.ne.0: if observed term energies are used in stg3 then they should be 
+entered into the tccdw.dat file as well, since it will still contain the 
+calculated term energies, and **must** be entered if the energy order of a 
+term is changed by stg3. Observed level energies can also be entered into 
+tccdw.dat to replace the calculated ones, the energy order of a level can 
+change.
+
+05/12/98 stgjk (2.21), stg3r (2.18), stgf(2.28)
+***********************************************
+Minor, for Cray.
+
+02/12/98 stg1nx (1.9), stg2nx (1.8), stg3nx (1.9)
+*************************************************
+Minor, but note the modified PARAM files.
+
+02/12/98 stg1r (2.33), stg2r (2.37)
+***********************************
+Minor.
+
+02/12/98 stgic (1.8)
+********************
+Minor, increased dimensions.
+
+30/11/98 stgf (2.28) 
+********************
+Bug-fix to stgf that affected 2.27 and earlier versions of 2.28 (stgfrad
+and stgfdamp are unaffected). Affected non-MQDT operation only, but both
+PERT='YES' and PERT='NO', over a limited energy range where a closed channel
+outer turning point moved-out beyond RTWO. The variable ONE was not defined!
+
+26/11/98 stgf (2.28), stgfrad (2.14), stgfdamp (2.6)
+****************************************************
+No longer interpolates when then is an imbalance between channels omitted
+at the two interpolation energies. Instead use one or the other (the one
+with the deepest channel omitted, that is still kept by the other).
+Also, tightened up convergence test of Coulomb functions from series.
+
+24/11/98 stg3r (2.18)
+*********************
+Added ESHIFT, energy in Rydbergs by which all target states are shifted. The
+net effect is to shift (only) correlation resonances by -ESHIFT. In &STG3B.
+
+08/10/98 stgic (1.8)
+********************
+Bug-fix to phase error in determining the recoupled line strengths. Collision
+strengths, apart from infinite energy, are unaffected.
+
+27/08/98 stgf (2.27), stgfrad (2.13), stgfdamp (2.5)
+****************************************************
+Introduced a much more flexible choice for RTWOC, the value of r at which
+CORINT is entered to evaluate the finite part of the MQDT open-closed and
+closed-closed multipole integrals. v2.26 uses RTWO (IRAD=0) or RZERO (IRAD=1).
+Both have their problems. If RINF, for a given channel, is "significantly" 
+larger than RZERO then the direct solution of the S.E. in CORINT breaks down 
+leading to large errors. If R2, for a given channel, is "significantly"
+smaller than the global RTWO then the Bode's rule integration from RZERO to
+RTWO gives large errors because it contains the divergent part of the integral.
+v2.27 chooses RTWOC at each energy for each total symmetry based on an 
+examination of the inner and outer turning points of each closed channel 
+solution and, where necessary, each open channel solution as well.
+Parallel changes have been made to stgfrad/stgfdamp.
+Also, introduced codeing so that the c-function is always integrated towards
+the divergence. Only when a closed-channel RINF exceeded RZERO was there a
+problem, and then only if PERT='YES'. Note, both MQDT and non-MQDT operations 
+were affected.
+Parallel changes have been made to stgfrad/stgfdamp.
+
+20/08/98 stgf (2.26), stgfrad (2.12), stgfdamp (2.4)
+****************************************************
+The line strengths from stgf following a NX run were incorrect. This affected
+the infinite energy point (inc. stgic). The problem arises because there are no
+coupled channels connecting target states of different spin. SR.RAD failed
+to take account of this and so thought that there should be rates between
+target states of different spin. This would not be a problem as such except,
+unfortunately, that the calculation of the line strengths is only completed
+following a successful determination of ALL (as RAD thinks) radiative 
+transitions (otherwise there is always a "premature" return from RAD). 
+I have modified RAD to take account of the NX circumstances. I have also
+changed it to fail safe so that any line strengths that it has determined will 
+always be correct. 
+Also, modified writes for IPRKM=4 so that stgic (1.8) does not need
+nz, nelc and npw specified, and zeroes for low-E/high-L K-matrix that would 
+normally be skipped in stgf, and split kmtls.dat into two files.
+Finally, fix for evaluation of c-function when RINF exceeds RZERO and the 
+integration is outwards - only affects high-L closed-channels i.e. the odd 
+energy point - see next release for full solution.
+
+11/08/98 stg1nx (1.8)-minor, stg2nx (1.7)
+*****************************************
+Updates for Cray. stg1nx minor. stg2nx needed a SAVE statement in ROOT, could
+have caused problems depending on compiler switch settings.
+
+06/08/98 stgic (1.8)
+********************
+Introduces an imode=-1 option for production runs. Results are calculated in
+a single pass interpolating from the stgf coarse mesh onto the user-specified
+fine mesh with no passing files written or scratch-file I/O. (The two step
+route, imode=0 followed by imode=1 is heavy on I/O and generates large passing
+files in large production runs.)
+
+27/07/98 stgic (1.7)
+********************
+Based on Don's (1.6) of 23/5/98, introduces Burgess dipole top-up at
+LRGLAM (best set=twice max total J - 2). The top-up is made using CC partial 
+omegas. If, in addition, LCBE is set positive then Coulomb-Bethe partial omegas 
+are calculated at 2*J=LCBE and higher, the ratios to CC printed (if IPRTOP=1)
+and the top-up is done with the CBe partial omegas.
+
+18/07/98 stgf (2.26), stgfrad (2.12), stgfdamp (2.4)
+****************************************************
+As you may be aware, the JBIN file can get very large in stgf production runs
+(e.g. Co2+). It has always been possible to run stgf in a single pass mode
+via the IEQ variable. This controlled how often the unphysical K/S-matrix was 
+updated on the specified fine mesh but it wasn't interpolated and this
+led to small steps in the cross section at the energies where the K/S-matrix
+was updated (trivially, JBIN was still written). I have now modified stgf/rad/damp
+so that the K/S-matrix is interpolated on a single pass run, and no JBIN file
+is written. This gives results identical to the two run strategy. One 
+should still use the (default) two run strategy to determine a suitable
+coarse and fine mesh, using a representative partial wave and energy range, but
+switch to a single pass for production runs to avoid generating JBIN. (To do
+this, specify the fine mesh as usual and then set IEQ equal to the number of
+coarse energy points that you want. These are distributed linearly across the
+energy range spanned by the fine mesh.) Of course, the drawback to not writing
+JBIN is obvious: if you decide you want a narrower mesh then the whole 
+calculation has to be repeated!
+
+15/07/98 stgf (2.26), stgfrad (2.12), stgfdamp (2.4)
+****************************************************
+Re-organised BP Burgess dipole top-up. Before (see 11/07/98) the top-up used 
+the maximum possible channel small l (LITLAM) for a given total 2*J given
+by LRGLAM. This meant that several higher J partials needed to be cycled
+thru to get the K/J top-up i.e. LRGLAM<<MAXLT. Now top-up uses the smallest 
+possible small l at LRGLAM. At most, one higher J can contribute to the
+K/J top-up and its neglect is a negligible effect in practice. (You can
+set LRGLAM=MAXLT-2 to see this.) This doesn't change the maximum J that
+you need since you should still top-up at approx the same small l, but is
+less likely to cause error. Also, before and now, the quadrupole top-up
+takes place at LRGLAM so one gets the maximum benefit now.
+
+11/07/98 stgf (2.26), stgfrad (2.12), stgfdamp (2.4)
+****************************************************
+Extended the Burgess sum-rule dipole top-up (in small l) to Breit-Pauli.
+No top-up in K/J (analagous to the LS top-up in large L) since this is small,
+but tedious to code for. If you want to top-up in K/J set LRGLAM.LT.LRGL2.
+The top-up is applied at LRGLAM and the higher partial waves are cycled
+through and any relevant K/J contributions are extracted. The maximum BP LRGL2
+than can contribute is LRGLAM+2*MAX(LAT)-2 (i.e. LRGLAM+2*MIN(LAT)+2 for a given 
+dipole transition) where LRGL2,LRGLAM,LAT contain twice the relevant J-values. 
+MAXLT interacts with LRGLAM as you would expect (both in LS and BP mode). 
+The sum rule is a difference between partial omegas and hence can be sensitive 
+to cancellation. In BP especially, it might be more accurate to use the Coulomb 
+Bethe (dipole) matrix elements to evaluate the top-up, via the long-present but 
+little-used LCBE parameter.
+
+07/07/98 stgfrad (2.12), stgfdamp (2.4)
+***************************************
+Dario spotted an inconsistancy between a dimension in a calling program
+(ZRMAT) and in a subprogram (VERT) - VERT was called with the wrong
+dimension info. Actually, the variable (B1) should have been originally
+dimensioned as indicated by the call to VERT i.e. (MZDEC,MZDEC) and not 
+(MZCHF,MZCHF), which at best is unnecessarily large and at worst causes
+a misaligment in memory, but that is very machine/compiler dependent.
+
+26/06/98 stgjk (2.20)
+*********************
+Incorporated the ISKIP feature of stg2r into stgjk. Works exactly the
+same, but tag parity as negative to read the subsequent iskip value 
+(use 2 for even parity instead of 0 then).
+
+25/06/98 stgf (2.26), stgfrad (2.12), stgfdamp (2.4) (minor)
+************************************************************
+Updates to output to kmatls.dat for stgic operation. Minor bug-fix.
+
+23/05/98 stgic (1.6)
+********************
+Extended to handle stgf K-matrices resultant from inner region run
+with the NX R-matrix codes.
+
+15/05/98 stgb (2.13) (minor)
+****************************
+AC->1.E-5 for consistancy with stgf,stgbf etc.
+
+05/05/98 stgf (2.26)
+********************
+Revert to old MQDT RZERO to infinity integrals when IRAD.GT.0 (writing data
+for stgbf) since RTWO is set artificially large and RZERO to RTWO diverges.
+(This is o.k. since stgbf is a low-L problem.) See 2.27 for full solution.
+
+02/05/98 stgjk (2.20)
+*********************
+Incorporated Tom's shifting of target term energies so as to get
+correct spin-orbit mixing for TCCs. Similar to stg3r use, e.g. use NSHIFT
+to switch-on.
+
+30/04/98 jajom (1.2)
+********************
+Minor mods by Don to improve running. This code will be retired shortly,
+it being superceded by stgic.
+
+30/04/98 stglib (2.11)
+**********************
+A bug in subroutine ORDTRI of the NJGRAF branch has been fixed by
+Stephen Bailey of QUB.
+
+29/04/98 stgf (2.25), stgfrad (2.11), stgfdamp (2.3) (minor)
+************************************************************
+Fix minor discontinuity in interpolation when channel dropped from
+one energy but not the other. Interpolated K-mx smooth now but S-mx not
+so good. In general, interpolating K-matrix is more reliable in "extreme"
+cases for MQDT. (Although S-mx is faster....)
+
+22/04/98 stg1r (2.32) minor
+***************************
+Minor (transparent) bug-fix.
+
+21/04/98 prebf (2.6) stgbf (2.13) 
+*********************************
+Allow unequal IPERT from stgb and stgf.
+
+18/04/98 stgf (2.25), stgfrad (2.11), stgfdamp (2.3)
+****************************************************
+Reworked perturbing potentials for both MQDT and non-MQDT operation.
+The MQDT perturbing integrals (as originally coded by Tom for the low-L
+radiation damped problem) failed spectacularly at high-L (>~15).
+The non-MQDT perturbing integrals were occasionally in error over a 
+narrow energy range just below thershold due to an instability in the
+outward integration. Later note: I was being optimistic here, see later
+versions, in particular 2.27.
+
+31/03/98 stgf (2.24), stgfrad (2.10), stgfdamp (2.2)
+****************************************************
+If you use MQDT via the K-matrix (IQDT=2) with PERT='YES' for high-L/J
+then re-running on the fine energy mesh can give garbage because the
+codes attempt to perturb the T-matrix but have none of the required info.
+This mainly affects stgf since the damped codes, by default, perturb the
+K-matrix so as to ensure a unitary (undamped) S-matrix. The stgf default
+was left as its historical perturbation of the T-matrix. All codes now
+perturb the K-matrix when PERT='YES' is used. This was a one line change.
+
+12/03/98 stgf (2.24), stgfrad (2.10), stgfdamp (2.2)
+****************************************************
+There is a bug in all versions of stgf that we have ever
+had/used (!). The routine WSQ (and hence WSQ2) incorrectly evaluates
+the Racah coefficient for the case of A=B and C=D. This could affect
+top-up and radiation damping. It occurs for la=la' and l=l'. It is
+possible that we have never encountered this transition for damping, or 
+that the radiative rate may already have been decoupled from an earlier 
+symmetry. LS data is unaffected.
+
+04/03/98 stgbf (2.13)
+*********************
+Phase factor in LS BETA evaluation - Lan Vo Ky.
+
+28/02/98 stgbf (2.12)
+*********************
+Tom's bug-fix in BETA for zero cross sections.
+
+24/02/98 stgic (1.5)
+********************
+First "public" release of Don's program to read unphysical k-matrices in LS 
+coupling generated by stgf, determine the unphysical k-matrices in pure jK 
+coupling or intermediate coupling and finally use these to determine and print 
+the collision strengths between individual levels. See the comments at the
+beginning of the code for the simple input and the document stgicadas.txt
+for help on usage.
+ 
+07/02/98 stgb (2.12), stgbb (2.4)
+*********************************
+Minor adjustments for Cray operation.
+
+07/02/98 stg1nx (1.7), stg2nx (1.6), stg3nx (1.8)
+*************************************************
+Minor adjustments for Cray operation.
+
+05/02/98 stgf (2.24), stgfrad (2.10), stgfdamp (2.2)
+****************************************************
+Bug-fixes to top-up and MQDT operation that occur in certain circumstances.
+
+29/01/98 stg3r (2.17)
+*********************
+Replaced JACORD by DIAG in HAMNEW and HAMNEW2.
+Made a few minor changes to avoid (Cray) compiler warnings.
+
+28/01/98 stg1r (2.31), stg2r (2.36), stgjk (2.19)
+*************************************************
+Made TCC generation more efficient for large LS cases, also use PARAM.TCC.
+Added some extra dimension tests. Made a few minor changes to avoid
+(Cray) compiler warnings.
+
+28/01/98 stglib (2.10)
+**********************
+Minor.
+
+20/01/98 stgdwic (1.5)
+**********************
+Dario's bug-fix to limit J's to those for which ALL LS partials exist.
+
+22/12/97 stgfdamp (2.1)
+***********************
+Added SR.PHOTO to stgfrad to make new stgfdamp code for further development
+of damped partial photorecombination/ionization etc. Unlike stgbf, the
+(unphysical) dipole matrices are NOT interpolated so interpolation in MQDT
+mode is not allowed for now (it wasn't in the old stgfrad either).
+
+16/12/97 stgfrad (2.9)
+**********************
+This is a major revision of stgfrad. Infact, a new version derived from the new
+stgf (2.23) so much cleaner coding and easier to follow. This also means that
+the MQDT is an improvement over the old stgfrad (2.8) since it interpolates
+either the unphysical S-matrix (IQDT=1) or the unphysical K-matrix (IQDT=2), 
+unlike the old one which just updated the (K-matrix) "periodically". 
+IQDT=100 or 200 parallels IQDT=1 or 2 but the JBIN is never read, only written.
+Optionally (IOMSW=0), "deeply" closed channels (n<l) are not dropped.......
+It has been tested-out against 2.8. Differences seen are due
+to round-off or a more accurate numerical treatment by 2.9 over 2.8.
+The stgfrad v2.9 and onwards will be pure radiation damping codes.
+The Auger damping and resolved (damped) photoionization/recombination will 
+appear in a "new" code - stgfdamp. stgfdamp is the code under which all new 
+development will be carried-out.
+
+16/12/97 stgf (2.23) 
+********************
+Parallel changes to stgfrad 2.9 i.e. K-matrix interpolation etc.
+
+03/12/97 prebf (2.5), stgbf (2.10) (~Minor)
+**********************************
+For each symmetry, if try to start from an excited STGB state (M11.GT.1) then
+wrong number of records were skipped, resulting in garbage presumably. Default
+usage is M11.EQ.1 so not a problem.
+
+07/11/97 stgbf (2.9)
+********************
+Added preconvolution capability to OP production (IPRINT=-1) routines OPVMAT & 
+OPDOUT. No changes to OPSTRA, it already had MQDT capability.
+
+14/10/97 stgbf (2.8)
+********************
+This is a major new release of stgbf which makes use of the recent developments
+to stgf (2.21, but 2.22 is needed). If stgf has been run in MQDT mode (IQDT=1)
+then stgbf runs in MQDT mode as well. Since only the original coarse energy
+mesh is fed from stgf, information must be supplied as to the new fine energy
+mesh to be used by stgbf. Currently, this is via the NAMELIST STGBF variables
+MXE, E0 and EINCR i.e. the same parameters that define the linear mesh of stgf.
+A subroutine mesh uses this info to tabulate the new mesh. Alternative meshes
+could be added in the future as linearity is not assumed. The unphysical
+S and D matrices are interpolated at the new physical energies. This is handled
+internally, no second run is necessary - unlike stgf. In addition, if EWIDTH
+is set .GE. 0.0 then the TOTAL photoionization cross section is preconvoluted
+with a Lorentzian of said width (all energies are z-scaled). EWIDTH should
+be set .GE. EINCR. A good set of values to start with is EINCR=1.E-4 in stgf 
+together with EINCR=1.E-5 and EWIDTH=1.E-5 in stgbf. Note, photorecombination
+data is meaningless above the first excited state.
+Currently, no beta asymmetry parameter data can be calculated in MQDT mode.
+ 
+26/09/97 stgf (2.22)
+********************
+Changed MQDT default updating of S-matrix to be at every energy, to be safe.
+Introduced (much) faster matrix inversion (real & complex) and diagonalization
+(complex) routines for non-BLAS operation.
+Also, modified output required by stgbf (2.8) and later.
+
+19/09/97 prebf (2.4) Minor
+********************
+Eliminate false warnings occuring in BP mode.
+
+11/09/97 stgf (2.21)
+********************
+Please find attached a new version of stgf (2.21) for your delectation.
+The main new feature (over 2.20) is an MQDT option to treat ALL closed
+channels as open. As a by-product, type-I radiation damping can be included
+to gave damped excitation and DR. The controlling option is IQDT. IQDT=0 runs 
+stgf in non-MQDT mode, as before. IQDT=1 activates MQDT mode. The variable
+IEQ controls how often the unphysical S-matrix is calculated, namely at
+IEQ equally spaced energies across the energy range defined by your mesh -
+the default is 100. The unphysical S-matrix is automatically  written to the
+file JBIN. Subsequent runs attempt to read JBIN and interpolate the S-matrix
+at the scattering energies requested. Delete JBIN to allow a new one to be
+written. Note, the "first" run that generates the S-matrix on a coarse mesh
+(via IEQ) will still calculate collision strengths on whatever (fine) energy 
+mesh you give it in the normal fashion, using the latest S-matrix to hand. This
+can give a small step-like nature to the calculated collision strengths.
+Second and subsequent runs which interpolate the S-matrix will be "smoother".
+The point of MQDT of course is that all of the time goes on evaluating the
+unphysical S-matrix at a few energies (since it is slowly varying) while
+the physical S-matrix (and hence collision strengths) can be evaluated
+at many more energies relatively cheaply. The Gailitis average works by
+calling MQDT to contract the S-matrix first and then a call to SQDT to
+average over channels attached to the lowest target state.
+Long-range dipole perturbing potentials are included when PERT='YES'.
+
+Please test it out (both IQDT=0 qnd IQDT=1) and let me know of any problems
+or suggestions for improvement. IQDT=0 and PERT='NO' should only give
+very small differences from existing versons of stgf, due to re-ordering
+of code. If PERT='YES' (and IQDT=0) larger differences may be noted from
+earlier versions. This due to the fact that all versions prior to (2.21) did 
+NOT symmetrize the K-matrix despite claiming to do so. Note, you really
+should use PERT='YES' or 'NO' to switch the perturbing potentials on and off.
+IPERT takes on a number of possible values and the code chooses the most
+appropriate one given the rest of your input options. If you set IPERT
+explicitly without appreciating the comments concerning its use then you
+might not get the desired result.
+
+If you're interesting in tracking the code then, as always, everything
+happens in sr.react - or rather everything is called by sr.react now
+since I have modularized it, if that's the right word. See sr.mqdt and
+sr.sqdt in particular. The comments in program main also give more details 
+on the new options and some I haven't mentioned (e.g. NDRMET) which are
+straightforward. Updated makefiles and PARAM files are attached as well.
+
+03/09/97 stg1nx(1.6),stg2nx(1.5),stg3nx(1.7) 
+********************************************
+Coded, and added NPTYIN option to NAMELIST STGNX, case of running single
+(N+1)-electron parity. Useful for when initial target of interest is an 
+S-state (factor 2 faster). Only read in CONTinuation mode (as we always go).
+NPTYIN=-1 (default) gives both parities as before.
+NPTYIN=0 gives even parity for even L and odd parity for odd L (e.g. H-like).
+NPTYIN=1 gives odd parity for even L and even parity for odd L (e.g. N-like).
+
+22/08/97 stgfrad (2.8)
+**********************
+Important bug-fix due to Tom concerning initialization of DDEC in SR.READB.
+
+20/08/97 stgf (2.20)
+********************
+IQDT=-1 evaluates detailed SQDT, damped (Type-I) & undamped, excitation and DR. 
+If NU.GT.QNMAX (any mesh) then Gailitis average applied to both excitation and 
+DR, damped & undamped (IQDT=0 or -1). SQDT means only channels associated
+with lowest closed term treated by QDT. This will be relaxed in the next 
+release.
+
+26/07/97 stgf (2.19)
+********************
+ALPHA and REACT incorporate I.P. efficiencies, along with some of my own.
+
+18/07/97 stg2r (2.35) Minor
+*********************
+Fixed inconsistency between initialization and namelist for LRNGDW.
+Increased an internal DW dimension.
+
+17/07/97 jajom (1.1)
+********************
+The Iron Project version of JAJOM has been installed, under ../rmatrix/misc.
+It has been customized for our OMEGA output, PARAM etc.
+NO user input is required. It reads JBIN and JJDAT from a previous (LS)
+run of stgf (see 2.18 below). If no TCC.DAT file is present it just
+recouples. If TCC.DAT is present from a short stg1r/stg2r/stgjk run
+(e.g. RELOP='TCC') then jajom term couples the LS T-matrix.
+Hint: delete RECUPH.DAT before making an LS run as stg3r will pick-up
+on it - stgf checks for LS on a jajom run.
+***WARNING*** I haven't looked at JAJOM with MQDT. So do not use/generate
+a JBIN file via IQDT=1 in stgf. Use the original IOPT1=10 or 11 method.
+(Also, currently, stgf then writes a slightly different format for JBIN for
+JAJOM as opposed to that required for (MQDT) stgf/stgbf use.)
+
+17/07/97 stgf (2.18)
+********************
+Write T-matrix (actually S=1-T) to file (JBIN) in JAJOM format and basic
+data for JAJOM (on file JJDAT) when IOPT1.GE.10. Based on KAB's SR.OUTJJ.
+The LS OMEGA still written unless IOPT1=11. IRAD is reset to zero, i.e. no
+radiative data is allowed - I guess this could be relaxed......
+
+10/07/97 stgf (2.17)
+********************
+Store OMEGA internally, with overflow to disk, to reduce I/O. Specify
+internal memory in megawords with PARAMETER MZMEG. Based on KAB's SR.OMEG.
+About 20% speed-up is the best I've seen. Set MZMEG=0 to write all OMEGA
+to disk as before.
+
+09/07/97 stgbf (2.7)
+********************
+Obvious bug on UNIT numbers being written for BETA asymmetry parameter fixed.
+Pointed out by Tom.
+
+07/07/97 stgfrad (2.7)
+**********************
+Re-calculate radiative loss at each energy testing to see if final state
+is stable against autoionization i.e. contributes to DR, and adjust as
+necessary. Also, NODAMP option can switch-off damping inside the box, really
+a check against stgbf.
+
+05/07/97 stgb (2.11) IP Update
+********************
+Incorporated Iron Project update, based-on OP 5.2, rather than OP 5.1
+which was the last IP stgb (if you follow). Actually nothing of direct
+interest. OP 5.2 has a more detailed effort to identify (i.e. label) the 
+bound states found. The actual IP update was to convert an OP ID file
+into an E file, whatever they are! Just keeps things up to date in case
+changes of interest to us are made at a later date.
+
+30/06/97 stgg (1.19)
+********************
+AGAIN fixed the projection bug, must have saved the wrong file (1.18)
+because the change wasn't present!
+Added IUP option to generate de-excitation cross sections (for Alfred's
+planned experiment). IUP=1 (default) upwards, IUP=0 downwards - energy
+scale is for the initial state in each case i.e. switched between up and down.
+Fixed minor bug when processing excitation to pseudo-state data i.e.
+direct ionization, original code was set-up for excitation-autoionization
+and did some setting up to enable a Lotz direct estimate to be added. This
+conflicted with projection when convoluted with a Gausssian.
+
+16/06/97 stgb (2.10)
+********************
+Zeroed-out radial functions (written to file for stgbf) for deeply closed channels
+where they are vanishingly small and move in from RTWO to generate non-zero functions
+for stgb use. stgbf needs to do likewise.
+
+04/06/97 stgg (1.18)
+********************
+Fixed bug in projection of pseudo-states for ionization.
+
+03/06/97 stgjk (2.18) IMPORTANT
+*********************
+Due to the problems with the SUN f77 4.0 compiler, I hadn't been
+updating stgjk. One of the PARAMETER statements defining the length
+of a common block had gotten out of sync with the corresponding value
+in stglib. You MUST use stgjk(2.17) with stglib(2.8) or, preferably,
+stgjk(2.18) with stglib(2.9) - see the first line of each code to check
+on the version number, if it's not there then Mitch must have deleted it 
+again!
+
+03/06/97 stg2r (2.34) Minor
+*********************
+Added IBUG3 and IBUG4 to NAMELIST STG2A.
+
+31/05/97 stgbf (2.6)
+********************
+Added option to select length (IGAUGE=0) or velocity gauge (IGAUGE=1,
+default) results for photorecombination. OMEGDR changed to OMEGPR!
+Recoded sr.numfc and sr.numb for deeply closed channels (zero-out),
+this should eliminate problems that occurred there.
+
+23/05/97 stg1r (2.30) minor
+*********************
+Activated a warning test that was incorrect and hence inactive.
+
+21/05/97 stgbf (2.5)
+********************
+Have coded for photorecombination via detailed balance of partial
+photoionization (undamped!). It is up to the user to ensure all
+possible initial photoionization states have been included so as
+to get photorecombination summed over all final states for the
+energy range of interest. Only runs when IPRINT=-2 selected.
+Output is to a standard OMEGDR file which can be copied to OMEGA
+and processed as you would an excitation collision strength.
+Note, you need a new stgf as well.
+Also made (BP) bug-fix (omitted by Werner) and minor Belfast fix.
+
+21/05/97 stgf (2.15)
+********************
+Added output of atomic weights (ISAT(I),LAT(I),I=1,NAST) to F00 for
+output to OMEGDR (via stgbf) - see above.
+Reset all FS,FC=0.0 when vanishingly small (used by stgbf else).
+
+13/05/97 stg2r (2.33)
+*********************
+Added my old Opacity Project code skip option. If target spin is -(2S+1)
+then READ(*,*)LSKP where LSKP is the number of terms of the SAME
+symmetry that must be skipped to get to the energetic one that is
+required for the CC expansion. All terms (unless NCUT.NE.0) are included
+in the CI expansion. If NCUT (via IKIP) is used to eliminate terms
+from the CI expansion as well then any skipping must be done with
+reference to tbe the term list that results AFTER NCUT/IKIP has
+been applied. In summary, NCUT/IKIP eliminates terms (CSF's) from
+the CI list (and hence the mixing) and thus the (possible) CC list
+while LSKP retains the term(s) in the CI but omits them from the CC
+list - thanks to Don for this summary.
+
+10/05/97 stgg (1.17)
+********************
+Added subroutine PROJECT which projects cross sections to pseudo-states
+back onto physical states. Requires a MIXDW.DAT file and a suitable
+OVRLAP file from AUTOSTRUCTURE.
+
+23/04/97 stg1r (2.29)
+*********************
+Alternative (STG1B) specification of pseudo-orbitals. In addition to specifying 
+the range through NMIN,NMAX,LMIN,LMAX; if NMAX is .LE. 0 (default, as all are)
+then the upper N-range of the pseudo orbitals NL is given by NPS(L), L=0,1,2..
+for s-,p-,d-.. orbitals i.e. it is L-dependent. NMIN,LMIN,LMAX are required, as
+before. Remark, one can of course combine the old ISMIT(K)=10*N+L to specify
+the odd extra orbitals beyond the common NMAX BUT one must remember to use
+K .GT. K0, where K0 is the last K indexed by NMIN,NMAX,LMIN,LMAX 
+i.e. K0=(NMAX-NMIN+1)*(LMAX-LMIN).
+
+02/04/97 stgg (1.16) Minor
+********************
+Mods to use of DW omega file via OMEGDW or as OMEGA.
+
+01/04/97 stgf (2.14)
+********************
+Every transition topped-up by lowest (positive) multipole. Very important
+for pseudo-state ionization. Previously, only dipole & quadrupole
+transitions were topped-up. Also, can now use LMX to specify largest
+perturbing multipole included when IPERT=1/PERT='YES', default=2 - just the
+original dipole and quadrupole. Only one multipole per channel is calculated,
+thus an octupole (lambda=3) potential is not included if there already exists
+a dipole potential.
+
+15/03/97 stgdw (2.20)
+*********************
+Don's mods to output partial and total cross sections.
+
+01/03/97 stg1r (2.28) Minor
+*********************
+Case IDWOUT=2 (DW only) allow MAXE to be set so as to enforce use
+of a finer radial mesh. Note, for DW with pseudo-states it is likely to
+be necessary to set the ISMITN and pseudo-orbital range still else the
+(dummy) single basis orbital will start at high-n and there may be
+problems in FINDER trying to find it. The initial energy estimate is geared 
+to low-n. Higher-n then depend on the previous e-energy.
+
+24/02/97 stgfrad (2.6)
+**********************
+Includes Tom's PHOTO subroutine for partial recombination/ionization.
+Dimensions now INCLUDEd via PARAM file as rest of codes.
+
+22/02/97 stg1r (2.27) stg2r(2.32)
+*********************************
+Increase dimension parameter for MXRKBB. This is difficult to set.
+It uses MXORB. However, the original MXORB wildly overestimates when
+MZLR1<<MZNR1 (see 19/12/96 below) and inflates memory of this and
+other arrays. Resetting MXORB to it the "correct" value when MZLR1<<MZNR1
+leads to MXRKBB being about a factor 3 too small when right at dimension
+limits. If MXRKBB is exceeded still, let me know. Note, you can do a
+very fast dimension check (<1min) in stg1r using NBUG=7.
+
+21/02/97 stgg (1.15)
+********************
+Can now read AUTOSTRUCTURE ayld file, for excitation-autoionization or
+second stage of REDA.
+
+20/02/97 stgdw (2.19)
+*********************
+Select partial wave using variable LSPI, e.g. = 30101 for triplet P odd.
+
+31/01/97 stgf (2.13) Minor
+********************
+Correct error message output when dimension exceeded.
+
+20/12/96 stgdw (2.18)
+*********************
+Added NCUT to exclude orbitals with N.GT.NCUT from continuum
+distorted wave potential.
+
+20/12/96 stgg (1.14)
+********************
+Treat R-matrix DR OMEGA file, including convolution of metastables, 
+correctly. Handle pseudo-state ionization (R-matrix and DW).
+
+19/12/96 stgdwic (1.4)
+**********************
+Don's version of 7/17/96 (sic) plus bug-fix by Alan (DUM=0.5) on S6J1.
+
+19/12/96 stg1r (2.26)
+*********************
+Reduce memory requirement case MZLR1<<MZNR1.
+Also, MAXC no longer reset to at least MAXNHF since solved stg2 prob.
+
+19/12/96 stg2r (2.31)
+*********************
+Reduce memory requirement case MZLR1<<MZNR1.
+Solved problem of NRANG2.LT.MAXNHF (re-dimensioned NSTO). 
+So can now set MAXC/NRANG2=1 for DW or NX operation.
+
+19/12/96 stglib (2.9)
+********************
+Reduce memory requirement case MZLR1<<MZNR1.
+
+19/12/96 stg3r (2.16) Minor
+********************
+Minor mods, remove AMP's.
+
+19/12/96 stgdw (2.17)
+*********************
+Mods for Don's latest stgdwic.
+
+12/12/96 stgbb (2.3)
+********************
+No preprocessing required.
+
+12/12/96 stgf (2.12)
+********************
+f90 mods: DOUBLE COMPLEX -> COMPLEX*16 and added AIMAG function
+as IMAG intrinsic function not available.
+Also, write S as well as Arad.
+
+12/12/96 stgbf (2.4)
+********************
+No-preprocessing required. Dimensions INCLUDEd from PARAM file.
+Terminate any SLp's that are input with -1-1-1 etc. or EOF. 
+Not 0 0 0, for consistancy with rest of outer region codes.
+Note: IFLAGV=1 (default). Set IFLAGV=0 to switch off VMAT integral
+that causes problems with deeply closed channels.
+
+06/12/96 prebf (2.3)
+********************
+No-preprocessing required. Dimensions INCLUDEd from PARAM file.
+Added Namelist PREBF (for IPRINT and IBUT). Terminate any SLp's
+that are input with -1-1-1 etc. or EOF. Not 0 0 0, for consistancy
+with rest of outer region codes.
+
+05/12/96 stgg (1.13)
+********************
+Fixed DR from metastables.
+
+30/11/96 stg1nx(1.5),stg2nx(1.4),stg3nx(1.6) Minor
+********************************************
+Mods for SUN f90 and DEC f77.
+
+29/11/96 stg1r (2.29)
+*********************
+Returned default mesh to IPTS=23
+
+29/11/96 stg3r(2.15) Minor
+********************
+Added CLOSE statement for DEC.
+
+29/11/96 stgg (1.12)
+********************
+Added output file for GNUPLOT.
+
+28/11/96 stgdw (2.16)
+*********************
+Increased dimension of NMSH2D and changed file omegdw to OMEGDW.
+
+25/11/96 stg1r (2.24)
+*********************
+The (SUN) f90 compiler and some other (CRAY?) f77 compilers do not allow
+a NAMELIST and subroutine to have the same name. I have been aware of
+this for a number of years and have avoided such a clash. But the O.P.
+created a NAMELIST STG1 and the I.P. created a subroutine STG1.
+As per stg2r, stg3r etc., I have now split NAMELIST STG1 into two, namely
+STG1A and STG1B, where "controlling" options are in STG1A and variable
+values in STG1B. Thus,
+
+5456       NAMELIST /STG1A/IOUT,IOUTDA,INDATA,IPSEUD,IDWOUT,
+5457      A NBUG1,NBUG3,NBUG5,NBUG7,NBUG8,NBUG9,KRELOP,LAM,
+5458      B RELOP,RAD,IRELOP,ISMITN
+5459 C
+5460       NAMELIST /STG1B/MAXLS,MAXPW,MAXE,LAMAX,MAXC,IBC,LCB,ISMIT,
+5461      B MAXLA,MAXLT,NMIN,NMAX,LMIN,LMAX,IMAX,TOLE,EMIN,NELCOR,IPTS
+
+I have also made the default radial mesh finer. I found an example
+(which took a long time to figure out) where the default mesh gave
+complete garbage. I have added the variable IPTS which controls the
+mesh fineness (IPTS=no. of points per half cycle * sqrt(2)). The 
+default WAS 23 and I have increased the default to 33.
+
+25/11/96 stg1nx (1.4), stg2nx (1.3), stg3nx (1.5)
+*************************************************
+No preprocessing required. Dimensions INCLUDEd via a PARAM file.
+Also, default Buttle correction now uses Seaton's fit. Set MJS=0
+to recover least squares.
+
+22/11/96 stgb (2.9)
+*******************
+No preprocessing required. Dimensions INCLUDEd via a PARAM file.
+
+21/11/96 stgb (2.8)
+*******************
+Allow execution to proceeed when closed channel wavefunction is
+zero everywhere outside of box.
+
+19/11/96 stgg (1.11)
+********************
+Reduce storage requirements, only store omegas to be plotted.
+
+18/11/96 stgg (1.10)
+********************
+Added NPLOTI, NPLOTF to pick out transition from initial state NPLOTI to
+final state NPLOTF.
+
+30/10/96 stg1r (2.23)
+*********************
+New SHMITT routine added to generate orthogonal set by diagonalizing matrix
+of overlaps. To access set ISMITN=1. IMPORTANT, ISMITN=-N is now used to
+access the SHMITN routine, starting continuum basis at n=N when pseudo-states
+present.
+
+31/10/96 stgf (2.11)
+********************
+Allow calculation to finish when EOF encountered on H.DAT (due
+to final symmetry in stg2/stg3 having no coupled channels,
+nothing is written but the previous MORE=1 has already been set).
+
+18/10/96 stgg (1.9)
+*******************
+omega -> OMEGA, omegadw -> OMEGDW
+
+18/10/96 stgb (2.7) stg3nx (1.4)
+********************************
+tapeh -> H.DAT
+
+18/10/96 stgf (2.10)
+********************
+Skip read of long-range coefficients (CF) if LAMAX=0. Case failed before.
+
+16/09/96 stg1r (2.21)
+*********************
+Implemented numerical schmidt orthogonalization for large pseudo-state basis - 
+set ISMITN=1, use NMIN,NMAX,LMIN,LMAX to specify ISMIT(I)=NL compactly.
+
+12/09/96 stgfrad (2.5)
+**********************
+Remove QDT option since have IQDT and Gailitis not required by damped code. 
+Mesh now uses constant dE after QNMAX where dE=2z**2/dn at QNMAX. INCLUDE 
+dimensions via PARAM file. Some IQDT tests made more robust. 
+Mods due to Alan Price.
+
+14/06/96 stgf(2.9)
+******************
+No preprocessing of dimensions now. They are read from file PARAM -
+not the same one as the inner-region! Inner and outer region codes
+are normally kept in separate directories.
+Changed file names tapeh->H.DAT and omega->OMEGA for consistancy with Belfast.
+Also, added parity to spin in the OMEGA file (LS case, was already there on J).
+
+12/06/96 stg1r,stg2r,stgjk,stg3r,stglib
+***************************************
+NO preprocessing of dimensions now. They are read from file PARAM. Two
+sample files PARAM.CC and PARAM.DW are available and can be copied to
+PARAM as required and the dimensions tweaked. tapeh->H.DAT in stg3r.
+
+12/06/96 stg1r(2.19)
+********************
+Allow Blume & Watson screening by other electrons WITHIN a sub-shell i.e.
+TOCC->TOCC-1.
+
+11/06/96 stgf(2.8)
+******************
+Added infinite energy omega (dipole only).
+
+06/06/96 stgjk(2.16)
+********************
+Tom's final fix of the indexing problem in RECUD for photoionization.
+Note: only requires stg2 (N+1) symmetries ordered such that ALL even parities 
+precede ALL odd.
+
+05/06/96 stgbb(2.2)
+*******************
+Again fix numerical failure for weak/strong closed channels.
+
+05/06/96 stgbb(2.1)
+*******************
+Initial workstation implementation of Belfast code.
+
+29/05/96 stg1r(2.18)
+********************
+Fix CIV3 option (so that it actually works!) for John Tully.
+
+24/05/96 stgb(2.4), stgf(2.7)
+*****************************
+Solved numerical failure for case of weakly and strongly closed
+channels (mainly stgb) required for inner-shell photoionization.
+
+21/05/96 stgjk,stg3r,stgb,stgf,stgbf (minor)
+********************************************
+Minor changes to eliminate compiler warnings an errors with f90.
+
+19/04/96 FARM
+*************
+Fixed a bug from Val Burke in subroutine sleqn of directory phv. Can cause
+crashes or possibly huge k-matrix elements/omegas. The results of "successful" 
+runs are claimed to be unaffected.
+
+19/04/96 stgf(2.5)
+******************
+Inline TANDTD in TLAG for efficiency.
+
+08/02/96 stgfrad(2.4)
+*********************
+Tom added NCUTOFF for DR.
+
+29/01/96 stg1r(2.17) minor
+**************************
+Fixed bug (introduced by me in v2.15) which gives "wrong" (!) Blume & 
+Watson screening when occupation numbers are not specified in the radial
+file. If they were specified then code was fine.
+
+18/11/95 stg3r(2.12)
+********************
+Tom's energy shifts of N+1 CFG eigenvalues added. Useful for 
+photoionization. See comments in code (NSHIFT) for details of use.
+
+11/11/95 stg2r(2.29)/stgdw(2.15)
+********************************
+stg2r, fix nl writes to MIXDW.DAT for model potential operation.
+stgdw v2.15 can now follow a model potential run of stg1r/stg2r.
+Continuum waves are distorted by a direct core model potential only,
+and direct plus local exchange for the valence orbitals.
+Can also read-in observed term energies, rydbergs relative to ground, 
+in same order as specified in stg2r (after any sorting) i.e. as listed
+in MIXDW.DAT.
+
+07/11/95 stg2r(2.28)
+********************
+Fixed obvious bug of 15/10/95, nl's were being written to unit=2 instead
+of unit=22, causing read error from stgdw v2.14.
+
+31/10/95 stgjk(2.14)
+********************
+Tom fixed an important bug affecting photoionization (and hence our
+damped code).
+
+15/10/95 stg1r(2.16),stg2r(2.27),stgjk(2.13),stg3r(2.11),stglib(2.7),stgdw(2.14)
+********************************************************************************
+Cosmetic changes and esoteric bigfixes from  Belfast, except
+stg2r/stgdw.f which now write/read the orbital definition
+list so that there can be no mismatch with the radial file
+(orbital numbers are not read by stg2r but stgdw did read them).
+Adding model potential to stgdw has still to be done but code
+now stops with an error message if this case is attempted.
+Added Bayliss alternative to Norcross for polarization potential.
+
+14/10/95 preprmx.f
+******************
+A preprocessor that works for all the current inner and outer
+region codes is now available under /misc together with dimension
+files ppn (inner), ppa (outer) and ppnx (NX-LS) for people/places
+without the tedi editor.
+
+04/10/95 FARM
+*************
+Several bugfixes, this solves some problems we had with large
+cases in N and O with odd values of omega being overwritten
+with numbers of order d-311.
+
+23/09/95 stg1r
+**************
+Reads orbital occupation numbers from the radial file for use by Blume&Watson.
+Zeroes/blanks default to original R-matrix coding which assumes for orbital
+of pricipal quantum number n that there are complete closed shells upto n-1.
+Thus there is no 2s**2 for 2p but 3p can have 2p**6 even if there is only 2p**4! 
+Hence new coding.
+Example of new orbital header card:
+
+   -7    2    2  0  2.0    -97.975267   310
+     
+The 2.0 (F5.1) is the occupation number.
+
+22/09/95 stg1r (minor)
+**********************
+Now accepts semi-relativistic bound orbitals from AUTOSTRUCTURE and
+switches-off appropriate mass-velocity and Darwin integrals. Reads
+a label from the radial file to determine orbital type, default non-rel.
+
+08/09/95 stgjk
+**************
+Belfast reversed bugfix in SPINOR BUT NOT IN BSPNO. Doesn't affect Fe25+
+for example but does affect Xe53+. The BSPNO bugfix was what corrected
+the long-range coefficients and hence our core radiative rates.
+
+06/09/95 stg2r IMPORTANT
+************************
+On 17/08/95 I attempted to fix a bug in stg2r - the pseudo-resonance overlap
+matrix was being evaluated in BP mode, but of course nothing was set for it.
+In jumping around this evaluation I accidently skipped one line too many, this
+unfortunately had a rather non obvious effect on BP results.
+
+30/08/95 stg2r
+**************
+Skip writes in DMEL when there are zero-coupled channels for a given
+symmetry elsewise stgjk aborts. Reorder symmetries into odd and even
+when INAST=0, required for stgjk dipole matrices.
+
+29/08/95 stg2r stgjk
+********************
+Don corrected write format error to tccdw in stgjk. Also changed sign of
+largest component of e-vector to be positive, for TCC comparisons with MCHF.
+
+26/08/95 stgdw(2.13)
+********************
+Takes symmetry order input from stg2r and outputs energy order K-,T-
+matrices for difls and stgic. This completes the outstanding developments.
+
+23/08/95 stgdw(2.12)
+********************
+A new release of stgdw which hopefully incorporates everyones favo(u)rite bits.
+Browse the comments to see what I mean.
+
+18/08/95 stg2r stgjk
+********************
+Added RELOP='MVD' to stg2r to be used in conjunction with TCC run and stg(dw)ic.
+Modified TCC output via stgjk.
+
+17/08/95 stg1r stg2r stgjk stg3r
+********************************
+stgjk IMPORTANT bug-fix for TCC's
+stg1r stg2r stg3r minor mods, including latest Belfast fixes.
+
+16/08/95 stgg.basic
+*******************
+A simplified version of my stgg is now available. It plots collision
+strengths from an omega file, nothing more. Requires the NCAR library.
+
+14/08/95 stg2r stgdw(2.11)
+**************************
+Joint release of stg2r/stgdw (v2.11) which treats L>LNOEX efficiently
+by skipping every other total spin. Specify MINST,MAXST as normal (i.e.
+as required for L<=LNOEX) everything should be handled transparently.
+DO NOT MIX THIS RELEASE WITH ANY EARLY VERSION OF STG2R/STGDW.
+
+11/08/95 stgdw IMPORTANT
+************************
+Exchange overlap assumed one electron orbital energies POSITIVE.
+IMPACT format should be NEGATIVE, required by AUTOSTRUCTURE and
+recommended for R-matrix. Changed sign of overlap so NEGATIVE
+input assumed, Tom has changed Fischer's code. AS was always negative.
+
+11/08/95 stgdw
+**************
+Input (namelist) variables tweaked a little.
+Elastic omega's and T-mx evaluated now.
+Test on whether input orbitals too big for NMSHBD now works correctly.
+
+08/08/95 NX codes
+*****************
+stg1nx, stg2nx, stg3nx updated to be consistent with new B.P. codes.
+If you want to use them with the old OP codes you will need to
+cp/mv the OP files tapenx1 -> NX1.DAT and tapenx2 -> NX2.DAT
+
+07/08/95 stg1r stgjk
+********************
+stg1r: Allow RELOP='TCC' input (equivalent to 'YES')
+stgjk: IDWOUT=2 correctly terminates after BOUNDJ (RELOP='TCC'
+ not actually needed when IDWOUT=2)
+
+05/08/95 stg1r stg2r stg3r (all minor)
+**************************************
+stg1r: mods to mesh and finder for numerical problems encountered with
+
+       neutrals.
+stg2r: mods to DW coding for CC operation.
+stg3r: pseudo-resonance removal OFF by default so as to think about TOLER
+
+08/07/95 stg2r/stgdw RELEASE
+********************************
+The final major revision of the stg2r/stgdw suite has now taken place.
+All obvious major CPU time and memory bottlenecks have been removed.
+Only bug fixes and tweaks should remain.
+
+07/07/95 stg2r
+**************
+collision algebra now stored and summed internally, leads to much
+smaller file for stgdw and faster execution for stgdw- no duplication
+or searching for duplication.
+
+06/07/95 stgdw
+**************
+Added automatic use of direct access file for when number of channels gets
+too large to store all continuum orbitals intenally.
+Use of symmetry ordered data now tested by block for duplicate coefficients,
+no longer a bottleneck.
+Fixed a couple of bugs.
+Current version: 2.9
+
+05/07/95 stgdw stg2r
+********************
+stgdw (V2.8) can now take SYMMETRY ORDERED data from STG2. This
+update is user transparent. stg2r has some minor mods for IDWOUT=2
+and symmetry order. Thus you should update stg2r on updating stgdw.
+In large cases it is extremely important to use symmetry ordered
+terms in stg2r. Note below the ISORT parameter to help you with this.
+
+01/07/95 stg2r stgdw
+********************
+Reduced dimension requirement of stg2r for IDWOUT=2 by adding &CHD:
+set=1 for IDWOUT=2 runs (large) and =&CHF for CC. Code checks for
+correct setting. Also, modified tagging of metastables so that can
+run symmetry order for stg2r with IDWOUT=2, note stgdw still needs
+energy order for now.
+Reduced dimension requirement of stgdw by adding NCHUD: set=NCHMD
+for (large) non-unitarized runs and =NCHFD for unitarized runs.
+This means that both stg2r and stgdw can deal with cases involving
+many thousands of channels and still only require 40-80Mb of memory.
+
+29/06/95 stg1r minor
+********************
+Added NBUG9 to NAMELIST. Also helpful warning message about
+explicitly setting LAMAX in NAMELIST  when MAXLA large causes
+memory/waste problems.
+
+26/06/95 FARM bug
+*****************
+A bug in FARM (gal/coul.f) has been corrected following notice from
+Valerie Burke. It ONLY affects IONS.
+
+22/06/95 stg2r stg3r
+*******************
+Dimension bug in Tom's pseudoresonance code fixed. In principle
+this could have affected TOLER=-1 runs but in practice only seems
+to have been a problem for large runs with TOLER=0.01.
+Have rewritten stg3r so that can use INAST.gt.0 with TOLER=0.01,
+useful for debugging! Tidied things up a bit as well.
+
+20/06/95 stg1r stg2r stgdw
+**************************
+Updated to allow DW to work when model potential (IPSEUD=1) used to
+reduce size of "core" problem.
+
+19/06/95 stgdw
+**************
+Last tweak? v2.6
+
+17/06/95 stgdw
+**************
+Numerics and memory optimized, results in good speed-up and space for
+big problem. Also, IPERT added for even faster runs.
+
+14/06/95 stg2r
+**************
+Added NMETA for IDWOUT=2. For NMETA<<NAST the speed-up is enormous as prior
+to this stg2r was still evaluating all NCHAN(NAST)*NCHAN(NAST) interactions,
+which were then ignored by stgdw for NMETA<<NAST. This reduces the stg2r run
+to neglible time (~ 1 min). As stg1r is also trivial (< 1 min) when IDWOUT=2
+99% of the time required for a DW run is now in stgdw - speed this up next?
+As noted before, stgdw requires the terms in stg2r to be energy ordered. This
+is inefficient but trivially so when IDWOUT=2. If a CC run is required as well
+it is better to run IDWOUT=0 with the terms symmetry ordered, the time reduction
+is approximately a factor NAST/NGROUPS where NGROUPS is the number of distinct
+SLp's. For "large" NAST this factor can be substantial. Thus, IDWOUT=1 is not
+currently recommended. I have added a parameter ISORT to namelist STG2A, when
+non-zero it will re-order the input terms to symmetry order but at the
+expense of expanding the CC expansion to the CI expansion - which is
+what is required in B.P. mode of course.
+
+13/06/95 stg2r
+**************
+Dimensions exceeded in ODH0 due to failure to initialize NONZER &
+NDIML to zero for each partial wave - now corrected. Error present
+since 13/04/95. Could affect all runs with stg2r.
+
+08/06/95 stg1r stg2r stgdw
+**************************
+Minor changes for DW operation. Go back to unscaled energies in stgdw.
+
+05/06/95 stgdw
+**************
+Minor changes: assume coeff's from algdw unique and reactance mx symmetric
+
+03/06/95 stg2r
+**************
+DW writes for algdw are now unformatted (to algdwu).
+
+02/06/95 stgdw (mega changes)
+***************
+A new parameter NMETA specifies the number of initial states (ground
+plus metastables since these are the important transitions for
+plasma modelling and experiment, excitation between excited states
+is unimportant until relatively high densities as the bulk of the
+population is in the ground and metastables - radiative transitions
+being the dominant depopulating mechanism for the excited states) that
+omega's are calculated for. In general, we would  set NMETA << NAST/NTERM
+for large NTERM and this should be highly efficient. I plan to do
+some timing comparisons for the Cl6+ E-A where NTERM=40 or so.
+
+The parameter NOMWRT output on the omega file gives the number of
+transitions in the omega vector, it depends straightforwardly on
+NMETA, NTERM and whether elastic transitions have been output (using
+the ELAS parameter). There should be no need for the user to set it,
+although it can be read-in.
+
+A new parameter NTHRSH specifies whether threshold omega's are
+calculated (IF .NE. 0) or not (IF .EQ. 0). These are calculated
+for all possible transitions specified by NMETA & NTERM so could
+be time consuming for large NMETA. The unitarization is basically
+just for the 2 target states (since no other omega's are calculated
+at the threshold energy) so if N-state unitarization is important it
+maybe more accurate to set NTHRSH=0 and assume constant omega's.
+The threshold omega's are written to the omega file in position 1 with
+energy set equal to 0.0000 and KM/MXE is incremented by 1 (IF NTHRSH.NE.0).
+
+I have removed the splining (sorry Tom) as I believe it is better done
+in a subsequent code which graphs the omega's and/or adds resonances
+and/or multiplies them by auger yields (such as the AUTOSTRUCTURE
+post-processor which I have been developing in tandem as per my last note)
+
+stgdw can now read either a formatted algdw file or an unformatted
+algdwu file, no user action is required other than to ensure that one of
+these two files is non-empty. I will shortly change stg2r to output
+an unformatted algdwu file (only - unless anyone objects, stg2 will be
+left as formatted algdw). For large cases I believe algdw(u) will
+become large enough for unformatted I/O to a significant time saving.
+I plan to leave the mixdw file as a formatted file as I don't think
+it will ever get excessively large.
+
+The IPRTM parameter can now be set negative for a very terse output
+to routdw for production runs.
+
+I think there was a small error in the elastic transitions. There used
+to be a test IF(NCHOP.LE.1) then skip to the next energy as there is no
+contribution to the omegas in this case. This is true for NCHOP=0 but
+for NCHOP=1 the tan(phase) should have been accounted-for.
+
+For ease/consistency with the R-matrix codes, the input scattering 
+energies EE are now expected to be in z-scaled Rydbergs.
+
+Note, stgdw requires that the target symmetries in stg2/stg2r be
+listed in energy order. stgdw now checks for this, we could re-index
+to allow non-energy order but life is too short. In the past it
+was necessary to group like symmetries together in stg2r for a B.P. 
+run. This is NO LONGER required, stg2r will re-order them in B.P.
+mode and leave them as input in LS mode - which is where we generate
+mixdw/aldw. This means you should always input the target terms in
+energy order in stg2r to make the dstg2 useable by all options.
+
+31/05/95 stg1r stg2r stglib stgjk
+*********************************
+IDWOUT=2 coded for fast DW operation, LRNGDW need not be set by user.
+Note, KCOR now passed from stg1r to stg2r correctly for algdw and stgdw.
+stglib required changes to evaluation of GAM(MA) to cope with IDWOUT=2.
+The BP codes now do everything the OP codes do except for the polarization.
+
+05/05/95 stgbf stgf
+*******************
+stgbf now calculates beta in jk-coupling, stgf has extra write of
+K quantum number for this.
+
+18/04/95 stgb, stgf, stgbf
+**************************
+New IP-BP stgb (no ID unit11 writes tho').
+Werner's prebf and stgbf (IP-BP) includes beta param.
+Dimensions &SA1 and &SA2 now required....
+stgf writes for stgbf beta uncommented (use IBETA to switch).
+This has Tom's NOMWRT param & my reduced dimension set.
+makeb and makebf makefiles updated.
+
+17/04/95 stg2r, stglib * stgjk
+******************************
+Tom's DW output (stg2r stglib) included but still need LRNGDW and stg1r
+to be done (then only polarization remains TBD).
+stgjk, Tom's alternate TCC output file.
+
+13/04/95 stg2r & stg3r
+**********************
+Tom's supression of pseudo-resonances included IF TOLER.GT.1.E-19 in
+stg3r NAMELIST/STG3B/, use NBUG9.gt.0 to get debug printout on fort.78.
+stg2r automatically writes to file amout (RELOP.EQ.'NO' only, for now), set
+IBUG5.gt.0 to get debug printout on fort.67.
+
+12/04/95 stg2r & stg3r
+**********************
+stg2r: Use RELOP='TCC' if you require TCC in stgjk (RELOP='TCC' again).
+stg3r: This uses NAST not NEST now for the observed target energies.
+Also, NAST .LT. 0 merges states; use NAST .GT. 0 to act like our old
+NEST .LT. 0.
+
+11/04/95 stg1r and f77
+**********************
+If you are using f77 version 2.x you need to increase the default
+allocations to -Nl40 (and maybe -Nx400). f77 v3.x defaults are
+sufficiently large.
+
+10/04/95 IRON PROJECT B.P. CODES
+********************************
+Minor bug fixes to stg1r, stg2r & stglib. IMPORTANT spin-orbit bug-fix
+to stgjk which corrects the long-range coefficients (finally).
+
+10/04/95 Opacity Project codes
+******************************
+These now include Tom's method for supressing pseudo-resonances.
+
+21/11/94 IRON PROJECT B.P. CODES
+********************************
+The Breit-Pauli codes from the Iron Project are now available.
+The I/O between stg's has changed but the UNIT 5 & 6 I/O  has
+been modified to conform to our requirements, so you should
+notice no difference in actual operation.
+The PREPROCESSING has changed however. This is now in the style
+of the asymptotic codes and could probably use our rmxppa.x code.
+However, I prefer to do away with "preprocessing" and just insert
+the dimensions with your favourite editor. Here is an example using TEDI:
+
+tedi stg1r
+u;ppnt
+
+The file ppnt contains the editing instructions and dimensions, and notes.
+The dimensioned code will be in stgn.f; the source code (stg1r) remains
+unchanged. Note, the file ppat can be used for all of the asymptotic codes.
+WARNING: It is easy to inflate the size of stgjk and stg3r, and to a lesser
+         extent stg1r. See comments in ppnt.
+I get exactly the same answers for the omega file as with the old BP codes.
+stgjk seems much FASTER than the old stgjj.
+The new BP codes have the same functionality as the old codes, i.e. model
+potential operation now works and the NX writes have been inserted. Still,
+there is no polarization potential or writes for stgdw. The Opacity Project
+codes should be retained for this purpose for now. It is probably worth
+keeping the old BP codes in directory /bpold say just incase future studies
+throw-up a case that needs to be checked against the old codes.
++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
+
+14/11/94 stgfrad (1.5)
+PARAMETERS as per stgf of 16/10/94
+
+06/10/94 stgf (1.8)
+H=0 IPERT=0 bug fixed. Also, PARAMETERS inserted so can edit dimensions 
+in rather than use preprocessor.
+
+17/09/94 Dirac-Fock R-matrix codes
+**********************************
+As from Belfast, completely untested. Past experience has shown that
+their Unix shell scripts are a pain. If the codes can be implemented as I
+have done for LS & B.P. codes etc, it would be appreciated by all.
+Note: a version a stgf for DF R-matrix is now present.
+
+03/09/94 stg1r
+Evaluation of bound orbital mass-velocity term when a core model potential
+is being used is believed to be incorrect. I have coded what I think is
+correct!
+
+13/08/94 stgjj, stg3r, stgf, makef
+Allow for rad decays in B.P. mode, either by decoupling K or reading
+radiative rates (from arad) explicitly - merits see me.
+NOT in stgfpar yet!
+
+25/07/94 stgf, stgfpar bugfix
+Near threshold closed-channel bug fixed and numerics improved.
+Elastic transitions available using ELAS parameter, default = 'NO'
+
+6/23/94  Tom modified stg3r so that the ground state can be shifted by a
+         negative energy.  I deleted the option that when EST(I).LT.0
+         (for NEST.NE.0), then EST is in cm-1 relative to ground state.
+         To shift the ground state, just have NEST.LT.0 and EST(1).LT.0
+         in Rydbergs, EST(I)-EST(1)=relative energies of higher states
+         in Rydbergs.
+
+6/23/94  Tom modified stgf so that IOPT1=2 can be used for Breit-Pauli mode.
+	 In that case, IS=0, so that is not a good flag for when to stop
+	 reading slpi list.  Instead, just specify IS=999, IL,IP arbitrary
+	 in dstgf to specify end of slpi list (see comments in stgf code). 
+
+20/05/94 FARM makefiles
+The FARM makefiles have been updated to work on NERSC Cray's.
+Don't forget to switch timings in asy/asy.f!
+
+16/05/94 *******FARM********FARM************FARM**************FARM***********
+*****************************************************************************
+
+FARM is now on russell ( under, ../rmatrix/nigel ) for testing. Initially,
+feedback to me changes wanted so I can coordinate them; also, any apparent
+errors so I can get back to Val Burke.
+If you don't have the gmake command available copy it, & set path if not in /farm.
+
+TO INSTALL (on russell):
+
+cp /export/home/atomic/rmatrix/nigel/farm.tar.gz  ~/rmatrix
+cd ~/rmatrix
+gunzip farm.tar
+tar xf farm.tar
+cd farm
+cp /export/home/atomic/rmatrix/nigel/gmake gmake
+./gmake MX=sunV
+
+END
+
+If all has gone well you should see an executable called stgfarm.x and a
+sample input dataset dstg.farm.
+The I/O structure of FARM is fundamentally different from stgf and stgfvpm.
+To overcome this I have adopted the following procedure. A parameter "iop"
+is used to switch between the original FARM I/O and our usual I/O. Set iop.eq.0
+and the I/O is as in the FARM write-up. iop.ne.0 (default) uses our "iprint"
+and "iprrm" variables to control I/O. I assume we will always use iop.ne.0.
+Then, our "omega" file will always be output, as will rmatel when iprrm=1
+(iprrm=2 has also been coded). "iprint" takes on the values -2,-1,0,+1
+and follows the spirit of out usual IPRINT variable. DO NOT use the "prtflg"
+variables discussed in the farm write-up when iop.ne.0 since "iprint" and "iprrm"
+will set-them. Unpredicatable results will occur if the two I/O methods are
+mixed. The rest ofthe input, however, is as described in the farm write-up.
+Energies/ranges/increments and L's are relatively straighforward.
+Also, lrglx (highest L/2J for which exchange has been included i.e. nspn.gt.0)
+must be set, unlike stgf/vpm which takes it from nspn.
+Similarly, jj=.true. must be set for B.P. operation, unlike stgf/vpm
+which deduces it from nspn=0.
+FARM sets-up a number of parameters using jj and lrglx before it has read the
+first nspn case and so it may not be easy to change this operation.
+Also, how could we determine a future non-exchange B.P. run (-0 !)?
+The lrglx parameter is rather a pain, partial waves are omitted if it it set
+incorrectly.
+I have tested-out a number of cases and have noted the following.
+For above threshold neutrals FARM  is a factor of 3 to 7 faster than the VPM method.
+Case of 6CC Cr.
+For positive ions, however, it is a factor of 4 to 5 slower than STGF (with
+PERT='YES') with all channels open. In the resonance region it is a factor
+of 10 to 15 slower! The case was 8CC-LS Kr6+.
+
+Points to note. The code is all in lower case, hence namelist input.
+Should you have the urge to make changes REMEMBER the default is
+implicit integer (a-z) so all reals must be declared explicitly.
+Further, most information is stored in the two vectors ix(1500000) and
+x(1500000) which are infact equivalenced! You have been warned.
+
+***********************END***************FARM**************************************
+
+13/05/94 stgfvpm
+stgfvpm gave me garbage for reactance matrices on SUN. The kmtrx (& kmtt) are
+integer arrays in sr.wrtkm ! Presumably o.k. on Cray since both are *8,
+otherwise Don would have noticed. Have changed to tkmtrx (& tkmtt), i.e. real.
+Note: sr.kmat does not appear to be used, k-matrices are obtained from vpm.
+Have taken the opportunity to move the omega re-indexing in sr.writom
+outside of the energy loop since it offended my sensibilities.
+
+07/05/94 stg1 stg(f)vpm
+stg1 replaced by Don's and minor bug for MAXLA=0 fixed.
+stg(f)vpm replaced by Don's BUT with Buttle coefficient DO LOOP  index
+increased from 50 to 100 consistent with Don's larger dimensions.
+Also, separate dimension tests inserted for XSPART/XTOT  for
+write to unit=3 crosstot. IPTOT .GT. 0 -> .NE. 0 ?
+
+05/05/94  Don stg1,vpm
+I have modified stg1 to used either the Norcross polarization potential
+or the Baylis potential: V= -(1/2)alpha*r^2/(r^2+rcut^2)^3.  The
+STG1 input variable IPLFN is used to determine which function is to
+be used: IPLFN=1 for Norcross; IPLFN=2 for Baylis.  Note the default
+is now set to Baylis.  I have also made some very changes in
+STGVPM.f, after determining that the changes that Nigel made to
+write files for the differential and partial cross section codes are
+correct; of course, the output for the partial cross section code
+does not work on the Sun.  The primary change is in the subroutine
+WRITOM.  It will now properly print the omega file, including the
+the elastic collision strengths when ELAS='YES'.  I have also increased
+the dimension on the number of channels from 40 to 60.
+
+
+03/05/94 stgf (minor)
+If neutral STOP!
+Moved dimension tests about a bit.
+
+30/04/94 Photoionization stgb,stgf,stgbf
+Minor fixes to photoionization operation (only IRAD=1 IPERT=0 worked).
+Warning, watch dimension &MNP in stgbf!
+
+28/04/94 B.P. Codes BUG
+stg2r contained a bug, the unit number for the rkints direct access
+file was not defined (defaulted to zero) this caused the rkints file
+to be corrupted (on SUN, - CRAY ?) when stg2r execution completed.
+The results from this run were o.k. but any subsequent re-run of
+stg2r using the corrupted file gave weird errors. If stg2r always followed
+stg1r, or the rkints file was read-only, or rkints from stg1r was stored
+as a separate file and then re-instated then there was no problem.
+---------------------------------------------------------------------------
+Also: stg1r and stg2r now write files for the NX code, needed if using
+model potential for the core. Minor bug in stg3r fixed, wouldn't recognize
+LRGL input for INAST.GT.0; should always use INAST=0 in anycase.
+
+23/04/94 stgdw & stg2
+ERROR in stgdw? In SR.CROSS label 171 should be 25 lines higher
+on IF(NUNIT.EQ.0)THEN
+
+Added write of MAXORB by stg2 to mixdw file for DW operation.
+Further adapted stgdw to operate when NRAD.GT.MAXORB; note
+previous problem was due to NRAD.LT.MAXORB. stgdw had more
+severe requirements than R-matrix tested-for. stgdw should
+now be consistent with what is allowed by R-matrix.
+
+20/04/94 stgdw
+errors corrected for case of vacant orbital numbers.
+top-up extended.
+
+15/04/94 stgf
+Fatal error in dipole top-up corrected,  caused by my quadrupole top-up - sorry.
+
+21/03/94  stg2
+GAMMA -> LOG(GAMMA)
+
+19/03/94 stg1 stg2
+simplifying DW operation
+
+18/03/94 stg2
+High-l fixes for DW
+
+17/03/94 rmatrix.dvi
+A tex file of a document describing the QUB codes is available
+as rmatrix.dvi it is about 125 pages long, happy reading.
+
+17/03/94 stg*nx
+The NX codes have been updated to utilize model potentials
+as a continuation of a stg*r run.
+
+17/03/94 stgfvpm.f
+Dons IPRRM writes implemented
+
+16/03/94 stg1 stg2
+minor changes
+
+09/03/94
+stgfvpm.f: skip evaulation of vanishingly small omegas (high-L).
+
+04/03/94
+High-L bug fix to stgf
+Top-up on vpm (stgfvpm.f) fixed.
+Output rewritten, use IPRINT=-2 and -1
+
+21/02/94 Iron Project Breit-Pauli R-matrix codes.
+*************************************************
+Use same (but revised) preprocessor as Opacity Project codes and
+same (but revised) ppn's. OP codes all updated for consistency with
+IP codes. The library stglib uses the dimensions pp2.
+IP codes to be run as
+stg1r
+stg2r           | stglib
+       stgjj    | stglib
+stg3r           | stglib
+stgf
+
+Sample datasets are provided for the Kr6+ problem
+If RELOP='NO' go 1,2,3; if RELOP='YES' go via jj. stgf is revised OP code.
+I have constructed a preprocessable stglib which uses pp2, seems o.k.!
+All input has been streamlined a la OP codes i.e. namelisted and free
+formatted. Test-run on C2+ looks o.k., fine-structure transitions required
+more basis orbitals (25) for convergence than LS operation (15).
+(Dipole) top-up is crude and untested; LS TOP cannot be applied.
+Model potential operation is eccentric.
+
+10/02/94 stg2
+Introduce MINLT,MAXLT,MINST,MAXST for automatic generation of
+total SLp's, useful for IDWOUT=2 high-L problem.
+
+03/12/93 non-exchange R-matrix codes installed
+preprmxnx.f
+ppnx
+stg1nx
+stg2nx
+stg3nx
+To be run in sequence 1,2,3 after stg1 and stg2 have been run
+for at least one partial wave to produce tapenx1 tapenx2 for the
+non-exchange code.
+All three use dstgnx (UNIT5) and dstg3 needs to be available,
+but a trivial generic one can be used if there are no energy shifts.
+
+30/10/93 stgf
+More high-L fixes, this time to Coulomb series.
+
+29/10/93 stgf
+More high-L fixes, this time to open-channel long-range integrals.
+
+27/10/93 stgf
+Introduction of variables MINLT & MAXLT into NAMELIST STGF to
+select only those SLp with L.GE.MINLT & L.LE.MAXLT, useful for
+non-exhange code where the use of IOPT1 would be tedious to select
+ 100 cases say.
+25/10/93   stgf
+Top-up of quadrupole transitions now done as well as dipole when
+LRGLAM specified .GT. 0.
+High-l tweaked including some REAL*16 for SUN which should become
+DOUBLE PRECISION on CRAY. Note on SUN that now use DOUBLE COMPLEX
+to be consistent with d.p. in rest of program, replace with COMPLEX
+on CRAY.
+
+22/10/93   stg3
+Bug-fixed that occurred when energy levels flipped by energy
+corrections (NEST .LT. 0) when INAST .GT. 0.
+INAST=0 enabled, i.e. a single pass is made through tape13 reading
+all partial wave data.
+
+19/10/93   stg1
+One- and two-body polarization potentials included a la' Mitroy,
+specify unique ALFD, RCUT and KCOR (last closed-shell orbital no.)
+in NAMELIST &STG1 of dstg1.

@@ -1,0 +1,41 @@
+Generic installation instructions for R-matrix.
+
+
+Dimension data files : PARAM 
+              (note that the inner region and outer region programs
+               use distinct PARAM files) which are INCLUDEd at compilation.
+
+R-matrix source: stg1r.f, stg2r.f, recupd.f/stgjk.f, stg3r.f, stglib.f (inner)
+                 stgf.f, stgb.f, prebf.f, stgbf.f, stgbb.f (outer)
+
+1. Unzip any compressed files:
+
+gunzip *
+
+
+2. Compile the library stglib which is required by stg2r, stgjk and stg3r:
+
+f95 -c stglib.f
+
+This produces an object file stglib.o.
+
+
+3. Compile and load each stg (note stg1r does not require stglib): e.g.
+
+f95 stg2r.f stglib.o -o stg2r.x
+
+Similarly for stg1r, recupd/stgjk and stg3r.
+
+
+4. Repeat 1. and 3. for the outer region code(s): e.g.
+
+f95 stgf.f -o stgf.x
+
+The outer region codes do not require any libraries, unless the BLAS
+versions are used (e.g. stgf_blas.f)
+
+
+P.S. You may need to switch-on optimization, e.g. f95 -O3
+if your compiler doesn't do so by default.
+
+N. R. Badnell  20/10/14
